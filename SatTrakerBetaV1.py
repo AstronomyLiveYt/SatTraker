@@ -3,19 +3,21 @@ from tkinter import filedialog
 import ephem
 import math
 import os
-import cv2
+import cv2 #If needing to pip install use pip/pip3 install opencv-python depending on version of python
 import numpy as np
 import sys
 import time
 import datetime
 import re
 import json
-import geocoder
+import geocoder #If needing to pip install use pip/pip3 install geocoder depending on version of python
 import serial
 import io
 import threading
-import win32com.client
-from PIL import Image as PILImage, ImageTk
+if os.name == 'nt': 
+	import win32com.client
+#TODO add conditionals around win32 code
+from PIL import Image as PILImage, ImageTk #If needing to pip install use pip/pip3 install Pillow  depending on version of python
 from urllib.request import urlopen
 
 class trackSettings:
@@ -240,7 +242,10 @@ class buttons:
         self.telescopeMenu = Menu(self.menu)
         self.menu.add_cascade(label='Telescope Type', menu=self.telescopeMenu)
         self.telescopeMenu.add_command(label='LX200 Classic Alt/Az', command=self.setLX200)
-        self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOM)
+        if os.name == 'nt': 
+                self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOM)
+#        if os.name == 'posix': 
+#                self.telescopeMenu.add_command(label='INDI Alt/Az (NOT FUNCTIONAL YET)', command=self.setINDI)
         
         self.trackingMenu = Menu(self.menu)
         self.menu.add_cascade(label='Tracking Type', menu=self.trackingMenu)
@@ -559,6 +564,9 @@ class buttons:
         
     def setASCOM(self):
         trackSettings.telescopetype = 'ASCOM'
+        
+    def setINDI(self):
+        trackSettings.telescopetype = 'INDI'
     
     def set_img_collect(self):
         if self.collect_images is False:
@@ -600,7 +608,10 @@ class buttons:
             print('Connecting to Scope.')
             if trackSettings.telescopetype == 'LX200':
                 try:
-                    self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'nt':
+                        self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'posix':
+                        self.comport = str(self.entryCom.get())
                     self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
                     self.ser.write(str.encode(':U#'))
                     self.serialconnected = True
@@ -626,6 +637,20 @@ class buttons:
                             self.tel.Connected = False 
                     else:
                         print("Unable to connect to telescope, expect exception")
+            elif trackSettings.telescopetype == 'INDI':
+                if self.tel.Connected:
+                    print("Telescope was already connected")
+                else:
+                    self.tel.Connected = True
+                    if self.tel.Connected:
+                        print("Connected to telescope now")
+                        axis = self.tel.CanMoveAxis(0)
+                        axis2 = self.tel.CanMoveAxis(1)
+                        if axis is False or axis2 is False:
+                            print('This scope cannot use the MoveAxis method, aborting.')
+                            self.tel.Connected = False 
+                    else:
+                        print("Unable to connect to telescope, expect exception")
         else:
             print('Disconnecting the Scope.')
             if trackSettings.telescopetype == 'LX200' and self.serialconnected is True:
@@ -634,6 +659,9 @@ class buttons:
                 self.ser.close()
                 self.serialconnected = False
             elif trackSettings.telescopetype == 'ASCOM':
+                self.tel.AbortSlew()
+                self.tel.Connected = False
+            elif trackSettings.telescopetype == 'INDI':
                 self.tel.AbortSlew()
                 self.tel.Connected = False
             trackSettings.tracking = False
