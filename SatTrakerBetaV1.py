@@ -376,9 +376,9 @@ class buttons:
                     altrate = math.degrees(self.radalt2 - self.radalt)
                     self.tel.Tracking = False
                     self.tel.SlewToAltAz(math.degrees(self.radaz2),math.degrees(self.radalt2))
+                    print(azrate, altrate)
                     self.tel.MoveAxis(0, azrate)
                     self.tel.MoveAxis(1, altrate)
-                    print(azrate, altrate)
                     time.sleep(0.001)                    
                 firstslew = False
             if trackSettings.objectfollow is False:
@@ -391,6 +391,7 @@ class buttons:
                 self.diffaltlast = 0
                 if trackSettings.telescopetype == 'ASCOM':
                     self.observer.date = datetime.datetime.utcnow()
+                    d = datetime.datetime.utcnow()
                     self.sat.compute(self.observer)
                     self.radalt = self.sat.alt
                     self.radaz = self.sat.az
@@ -404,12 +405,12 @@ class buttons:
                     self.radaz2 = self.sat.az
                     azrate = (math.degrees(self.radaz2 - self.radaz))*math.cos(self.radalt2)
                     altrate = math.degrees(self.radalt2 - self.radalt)
-                    #print(currentaz, currentalt, azrate, altrate)
+                    print('Current az, current alt, azrate, altrate', currentaz, currentalt, azrate, altrate)
                     if math.fabs(self.diffazlast) < math.fabs(diffaz):
-                        azrate = azrate + diffaz
+                        azrate = ((math.degrees(self.radaz2 - self.radaz)+diffaz)*math.cos(self.radalt2))
                     if math.fabs(self.diffaltlast) < math.fabs(diffalt):
-                        altrate = altrate + diffalt
-                    #print(diffaz, diffalt, azrate, altrate)
+                        altrate = (math.degrees(self.radalt2 - self.radalt)+diffalt)
+                    print('diffaz, diffalt, azrate, altrate', diffaz, diffalt, azrate, altrate)
                     self.tel.MoveAxis(0, azrate)
                     self.tel.MoveAxis(1, altrate)
                     self.diffazlast = diffaz
@@ -457,6 +458,7 @@ class buttons:
                 if trackSettings.telescopetype == 'ASCOM':
                     time.sleep(0.1)
                     self.observer.date = datetime.datetime.utcnow()
+                    d = datetime.datetime.utcnow()
                     self.sat.compute(self.observer)
                     self.radalt = self.sat.alt
                     self.radaz = self.sat.az
