@@ -1,23 +1,67 @@
 from tkinter import *
 from tkinter import filedialog
-import ephem
+import ephem #If needed to pip install use pip/pip3 install pyephem depending on version of python
 import math
 import os
-import cv2
+import cv2 #If needing to pip install use pip/pip3 install opencv-python depending on version of python
 import numpy as np
 import sys
 import time
 import datetime
 import re
 import json
-import geocoder
-import serial
+import geocoder #If needing to pip install use pip/pip3 install geocoder depending on version of python
+import serial #If needing to pip install use pip/pip3 install pyserial depending on version of python
 import io
 import threading
-import win32com.client
-import imutils
-from PIL import Image as PILImage, ImageTk
+#TODO add conditionals around win32 code
+if os.name == 'nt': #ignore this import on non-windows systems
+	import win32com.client
+if os.name != 'nt': #Non windows system use INDI
+	import PyIndi #If needing to pip install use pip/pip3 install pyindi-client depending on version of python
+import imutils #If needing to pip install use pip/pip3 install imutils depending on version of python
+from PIL import Image as PILImage, ImageTk #If needing to pip install use pip/pip3 install Pillow  depending on version of python
 from urllib.request import urlopen
+
+if os.name != 'nt':
+	class IndiClient(PyIndi.BaseClient):
+		def __init__(self):
+			super(IndiClient, self).__init__()
+		def newDevice(self, d):
+			global dmonitor
+			# We catch the monitored device
+			dmonitor=d
+			print("New device ", d.getDeviceName())
+		def newProperty(self, p):
+			global monitored
+			global cmonitor
+			# we catch the "CONNECTION" property of the monitored device
+			if (p.getDeviceName()==monitored and p.getName() == "CONNECTION"):
+				cmonitor=p.getSwitch()
+				print("New property ", p.getName(), " for device ", p.getDeviceName())
+		def removeProperty(self, p):
+			pass
+		def newBLOB(self, bp):
+			pass
+		def newSwitch(self, svp):
+			pass
+		def newNumber(self, nvp):
+			global newval
+			global prop
+			# We only monitor Number properties of the monitored device
+			prop=nvp
+			newval=True
+		def newText(self, tvp):
+			pass
+		def newLight(self, lvp):
+			pass
+		def newMessage(self, d, m):
+			pass
+		def serverConnected(self):
+			pass
+		def serverDisconnected(self, code):
+			pass
+
 
 class trackSettings:
     
@@ -226,7 +270,10 @@ class buttons:
         self.startButton.grid(row=7, column = 1)
         self.startButton = Button(self.bottomframe, text='Connect/Disconnect Scope', command=self.set_tracking)
         self.startButton.grid(row=1, column = 1)
-        self.ComLabel = Label(self.bottomframe, text='COM Port')
+        if os.name == 'nt':
+            self.ComLabel = Label(self.bottomframe, text='COM Port')
+        if os.name != 'nt':
+            self.ComLabel = Label(self.bottomframe, text='Serial Device Port')
         self.ComLabel.grid(row = 2, column = 0)
         self.entryCom = Entry(self.bottomframe)
         self.entryCom.grid(row = 2, column = 1)
@@ -254,8 +301,15 @@ class buttons:
         self.menu.add_cascade(label='Telescope Type', menu=self.telescopeMenu)
         self.telescopeMenu.add_command(label='LX200 Classic Alt/Az', command=self.setLX200AltAz)
         self.telescopeMenu.add_command(label='LX200 Classic Equatorial', command=self.setLX200Eq)
-        self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
-        self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
+        if os.name == 'nt': 
+                self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
+                self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
+#       if os.name == 'posix': 
+#                self.telescopeMenu.add_command(label='INDI Alt/Az (NOT FUNCTIONAL YET)', command=self.setINDIAltAz)
+#                self.telescopeMenu.add_command(label='INDI Equatorial (NOT FUNCTIONAL YET)', command=self.setINDIEq)
+
+        
+        
         
         self.trackingMenu = Menu(self.menu)
         self.menu.add_cascade(label='Tracking Type', menu=self.trackingMenu)
@@ -830,6 +884,14 @@ class buttons:
         trackSettings.telescopetype = 'ASCOM'
         trackSettings.mounttype = 'Eq'
     
+    def setINDIAltAz(self):
+        trackSettings.telescopetype = 'INDI'
+        trackSettings.mounttype = 'AltAz'
+        
+    def setINDIEq(self):
+        trackSettings.telescopetype = 'INDI'
+        trackSettings.mounttype = 'Eq'
+    
     def set_img_collect(self):
         if self.collect_images is False:
             self.collect_images = True
@@ -870,7 +932,12 @@ class buttons:
             print('Connecting to Scope.')
             if trackSettings.telescopetype == 'LX200':
                 try:
-                    self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'nt':
+                        self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'posix':
+                        self.comport = str(self.entryCom.get())
+                        if '/' not in self.comport: #If user doesn't specify a path containing / assume it's a /dev/ entry
+                            self.comport = str('/dev/'+str(self.comport))
                     self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
                     self.ser.write(str.encode(':U#'))
                     self.serialconnected = True
@@ -901,6 +968,20 @@ class buttons:
                             print(self.axis1rate)
                     else:
                         print("Unable to connect to telescope, expect exception")
+            elif trackSettings.telescopetype == 'INDI':
+                if self.tel.Connected:
+                    print("Telescope was already connected")
+                else:
+                    self.tel.Connected = True
+                    if self.tel.Connected:
+                        print("Connected to telescope now")
+                        axis = self.tel.CanMoveAxis(0)
+                        axis2 = self.tel.CanMoveAxis(1)
+                        if axis is False or axis2 is False:
+                            print('This scope cannot use the MoveAxis method, aborting.')
+                            self.tel.Connected = False 
+                    else:
+                        print("Unable to connect to telescope, expect exception")
         else:
             print('Disconnecting the Scope.')
             if trackSettings.telescopetype == 'LX200' and self.serialconnected is True:
@@ -909,6 +990,9 @@ class buttons:
                 self.ser.close()
                 self.serialconnected = False
             elif trackSettings.telescopetype == 'ASCOM':
+                self.tel.AbortSlew()
+                self.tel.Connected = False
+            elif trackSettings.telescopetype == 'INDI':
                 self.tel.AbortSlew()
                 self.tel.Connected = False
             trackSettings.tracking = False
