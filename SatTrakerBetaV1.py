@@ -14,14 +14,12 @@ import geocoder #If needing to pip install use pip/pip3 install geocoder dependi
 import serial #If needing to pip install use pip/pip3 install pyserial depending on version of python
 import io
 import threading
+#TODO add conditionals around win32 code
 if os.name == 'nt': #ignore this import on non-windows systems
 	import win32com.client
 if os.name != 'nt': #Non windows system use INDI
 	import PyIndi #If needing to pip install use pip/pip3 install pyindi-client depending on version of python
 import imutils #If needing to pip install use pip/pip3 install imutils depending on version of python
-from PIL import Image as PILImage, ImageTk
-
-#TODO add conditionals around win32 code
 from PIL import Image as PILImage, ImageTk #If needing to pip install use pip/pip3 install Pillow  depending on version of python
 from urllib.request import urlopen
 
