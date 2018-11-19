@@ -15,6 +15,7 @@ import serial
 import io
 import threading
 import win32com.client
+import imutils
 from PIL import Image as PILImage, ImageTk
 from urllib.request import urlopen
 
@@ -42,6 +43,7 @@ class trackSettings:
     maxpixel = 255
     flip = 'NoFlip'
     foundtarget = False
+    rotate = 0
     
 
 class videotrak:
@@ -198,6 +200,7 @@ class buttons:
             trackSettings.minbright = float(clines[9])
             trackSettings.flip = str(clines[10])
             trackSettings.mounttype = str(clines[11])
+            trackSettings.rotate = int(clines[12])
             config.close()
         except:
             print('Config file not present or corrupted.')
@@ -265,6 +268,10 @@ class buttons:
         self.imageMenu.add_command(label='Vertical Flip', command=self.setVerticalFlip)
         self.imageMenu.add_command(label='Horizontal Flip', command=self.setHorizontalFlip)
         self.imageMenu.add_command(label='Vertical and Horizontal Flip', command=self.setVerticalHorizontalFlip)
+        self.imageMenu.add_command(label='Rotate Image 0 Degrees', command=self.set0Rotate)
+        self.imageMenu.add_command(label='Rotate Image 90 Degrees', command=self.setPos90Rotate)
+        self.imageMenu.add_command(label='Rotate Image -90 Degrees', command=self.setNeg90Rotate)
+        self.imageMenu.add_command(label='Rotate Image 180 Degrees', command=self.set180Rotate)
         
     def setNoFlip(self):
         trackSettings.flip = 'NoFlip'
@@ -277,6 +284,18 @@ class buttons:
         
     def setVerticalHorizontalFlip(self):
         trackSettings.flip = 'VerticalHorizontalFlip'
+        
+    def set0Rotate(self):
+        trackSettings.rotate = 0
+    
+    def setPos90Rotate(self):
+        trackSettings.rotate = 90
+        
+    def setNeg90Rotate(self):
+        trackSettings.rotate = -90
+        
+    def set180Rotate(self):
+        trackSettings.rotate = 180
         
     def exitProg(self):
         config = open('satconfig.txt','w')
@@ -292,6 +311,7 @@ class buttons:
         config.write(str(trackSettings.minbright)+'\n')
         config.write(str(trackSettings.flip)+'\n')
         config.write(str(trackSettings.mounttype)+'\n')
+        config.write(str(trackSettings.rotate)+'\n')
         config.close()
         sys.exit()
     
@@ -618,8 +638,8 @@ class buttons:
                                 diffinaz = math.degrees(math.acos((math.cos(math.radians(objectdistance)) - math.cos(math.radians(90 - currentaltdegrees)) * math.cos(math.radians(90 - objectalt))) / (math.sin(math.radians(90 - currentaltdegrees)) * math.sin(math.radians(90 - objectalt)))))
                                 if math.fabs(objectangle2) > 90:
                                     diffinaz = -1 * diffinaz
-                                altdiff = math.radians(objectalt) - currentalt
-                                azdiff = math.radians(diffinaz)
+                                altdiff = math.degrees(math.radians(objectalt) - currentalt)
+                                azdiff = diffinaz
                                 totaldiff = math.sqrt(altdiff**2 + azdiff**2)
                                 self.observer.date = (d + datetime.timedelta(seconds=1))
                                 self.sat.compute(self.observer)
@@ -627,10 +647,10 @@ class buttons:
                                 self.radaz2 = self.sat.az
                                 azrate = (math.degrees(self.radaz2 - self.radaz))
                                 altrate = math.degrees(self.radalt2 - self.radalt)
-                                if math.fabs(self.diffazlast) < math.fabs(azdiff):
-                                    azrate = azrate + azdiff
-                                if math.fabs(self.diffaltlast) < math.fabs(altdiff):
-                                    altrate = altrate + altdiff
+                                #if math.fabs(self.diffazlast) < math.fabs(azdiff):
+                                azrate = azrate + azdiff
+                                #if math.fabs(self.diffaltlast) < math.fabs(altdiff):
+                                altrate = altrate + altdiff
                                 if azrate > self.axis0rate:
                                     azrate = self.axis0rate
                                 if azrate < (-1*self.axis0rate):
@@ -639,6 +659,7 @@ class buttons:
                                     altrate = self.axis1rate
                                 if altrate < (-1*self.axis1rate):
                                     altrate = (-1*self.axis1rate)
+                                print('azdiff, altdiff, azrate, altrate', azdiff, altdiff, azrate, altrate, end='\r')
                                 self.tel.MoveAxis(0, azrate)
                                 self.tel.MoveAxis(1, altrate)
                                 self.diffazlast = azdiff
@@ -673,10 +694,10 @@ class buttons:
                                 self.radra2 = self.sat.ra
                                 rarate = (math.degrees(self.radra2 - self.radra))
                                 decrate = math.degrees(self.raddec2 - self.raddec)
-                                if math.fabs(self.diffralast) < math.fabs(radiff):
-                                    rarate = rarate + radiff
-                                if math.fabs(self.diffdeclast) < math.fabs(decdiff):
-                                    decrate = decrate + decdiff
+                                #if math.fabs(self.diffralast) < math.fabs(radiff):
+                                rarate = rarate + math.degrees(radiff)
+                                #if math.fabs(self.diffdeclast) < math.fabs(decdiff):
+                                decrate = decrate + math.degrees(decdiff)
                                 if rarate > self.axis0rate:
                                     rarate = self.axis0rate
                                 if rarate < (-1*self.axis0rate):
@@ -1161,6 +1182,7 @@ class buttons:
                     self.img = cv2.flip(self.img, 1)
                 if trackSettings.flip == 'VerticalHorizontalFlip':
                     self.img = cv2.flip(self.img, -1)
+                self.img = imutils.rotate(self.img, trackSettings.rotate)
                 #remember current time of the frame
                 self.dnow = datetime.datetime.now()
                 self.height, self.width = self.img.shape[:2]
