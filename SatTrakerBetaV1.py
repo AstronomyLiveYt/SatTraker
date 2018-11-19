@@ -466,11 +466,11 @@ class buttons:
                         time.sleep(1)
                 firstslew = False
                 if trackSettings.telescopetype == 'ASCOM':
-                        self.dlast = self.dnow
-                        d = datetime.datetime.utcnow()
-                        self.observer.date = (d + datetime.timedelta(seconds=0))
-                        self.sat.compute(self.observer)
-                        if trackSettings.mounttype == 'AltAz':
+                    self.dlast = self.dnow
+                    d = datetime.datetime.utcnow()
+                    self.observer.date = (d + datetime.timedelta(seconds=0))
+                    self.sat.compute(self.observer)
+                    if trackSettings.mounttype == 'AltAz':
                         self.radalt = self.sat.alt
                         self.radaz = self.sat.az
                         self.observer.date = (d + datetime.timedelta(seconds=1))
@@ -557,8 +557,8 @@ class buttons:
                         self.tel.MoveAxis(1, altrate)
                         self.diffazlast = diffaz
                         self.diffaltlast = diffalt
-                    altcorrect = 0
-                    azcorrect = 0
+                        altcorrect = 0
+                        azcorrect = 0
                     if trackSettings.mounttype == 'Eq':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
@@ -618,10 +618,10 @@ class buttons:
                             i = 0
                             print(math.degrees(totaldiff))
                             self.lasttotaldiff = totaldiff
-                    
+                            
                         self.radaz = self.radaz + azcorrect
                         self.radalt = self.radalt + altcorrect
-                    
+                        
                         self.rad_to_sexagesimal_alt()
                         targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
                         targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
@@ -703,6 +703,22 @@ class buttons:
                                 #if math.fabs(self.diffazlast) < math.fabs(azdiff):
                                 azrate = azrate + azdiff
                                 #if math.fabs(self.diffaltlast) < math.fabs(altdiff):
+                                altrate = altrate + altdiff
+                                if azrate > self.axis0rate:
+                                    azrate = self.axis0rate
+                                if azrate < (-1*self.axis0rate):
+                                    azrate = (-1*self.axis0rate)
+                                if altrate > self.axis1rate:
+                                    altrate = self.axis1rate
+                                if altrate < (-1*self.axis1rate):
+                                    altrate = (-1*self.axis1rate)
+                                print('azdiff, altdiff, azrate, altrate', azdiff, altdiff, azrate, altrate, end='\r')
+                                self.tel.MoveAxis(0, azrate)
+                                self.tel.MoveAxis(1, altrate)
+                                self.diffazlast = azdiff
+                                self.diffallast = altdiff
+                            except:
+                                print('Failed to do the math.')
                     if trackSettings.mounttype == 'Eq':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
