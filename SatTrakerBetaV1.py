@@ -618,7 +618,7 @@ class buttons:
                             i = 0
                             print(math.degrees(totaldiff))
                             self.lasttotaldiff = totaldiff
-                            
+                        
                         self.radaz = self.radaz + azcorrect
                         self.radalt = self.radalt + altcorrect
                         
@@ -856,7 +856,7 @@ class buttons:
             time.sleep(0.005)
         #stop moving the telescope if the user is on ASCOM and requested stop tracking.
         if trackSettings.telescopetype == 'ASCOM' and trackSettings.trackingsat is False:
-            self.tel.AbortSlew    
+            self.tel.AbortSlew
     
     def set_center(self):
         trackSettings.setcenter = True
@@ -878,7 +878,7 @@ class buttons:
     def setASCOMAltAz(self):
         trackSettings.telescopetype = 'ASCOM'
         trackSettings.mounttype = 'AltAz'
-        
+    
     def setASCOMEq(self):
         trackSettings.telescopetype = 'ASCOM'
         trackSettings.mounttype = 'Eq'
@@ -958,7 +958,7 @@ class buttons:
                         if axis is False or axis2 is False:
                             print('This scope cannot use the MoveAxis method, aborting.')
                             self.tel.Connected = False 
-                    else:
+                        else:
                             self.axis0rate = float(self.tel.AxisRates(0).Item(1).Maximum)
                             self.axis1rate = float(self.tel.AxisRates(1).Item(1).Maximum)
                             print(self.axis0rate)
@@ -1031,38 +1031,38 @@ class buttons:
             
             if trackSettings.telescopetype == 'ASCOM':
                 if trackSettings.mounttype == 'AltAz':
-                self.X1 = math.radians(self.tel.Azimuth)
-                self.Y1 = math.radians(self.tel.Altitude)
-                startx = self.targetX
-                starty = self.targetY
-                if starty < (self.height/2):
-                    distmoved = 0
-                    self.tel.MoveAxis(1, 0.1)
-                    while distmoved < 100:
-                        currentx = self.targetX
-                        currenty = self.targetY
-                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                    self.X1 = math.radians(self.tel.Azimuth)
+                    self.Y1 = math.radians(self.tel.Altitude)
+                    startx = self.targetX
+                    starty = self.targetY
+                    if starty < (self.height/2):
+                        distmoved = 0
+                        self.tel.MoveAxis(1, 0.1)
+                        while distmoved < 100:
+                            currentx = self.targetX
+                            currenty = self.targetY
+                            distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                    self.tel.AbortSlew
-                    self.X2 = math.radians(self.tel.Azimuth)
-                    self.Y2 = math.radians(self.tel.Altitude)
-                    self.separation_between_coordinates()
-                    self.imagescale = self.separation/distmoved
-                    print(self.imagescale, ' degrees per pixel.')
-                else:
-                    distmoved = 0
-                    self.tel.MoveAxis(1, -0.1)
-                    while distmoved < 100:
-                        currentx = self.targetX
-                        currenty = self.targetY
-                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                        self.tel.AbortSlew
+                        self.X2 = math.radians(self.tel.Azimuth)
+                        self.Y2 = math.radians(self.tel.Altitude)
+                        self.separation_between_coordinates()
+                        self.imagescale = self.separation/distmoved
+                        print(self.imagescale, ' degrees per pixel.')
+                    else:
+                        distmoved = 0
+                        self.tel.MoveAxis(1, -0.1)
+                        while distmoved < 100:
+                            currentx = self.targetX
+                            currenty = self.targetY
+                            distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                    self.tel.AbortSlew
-                    self.X2 = math.radians(self.tel.Azimuth)
-                    self.Y2 = math.radians(self.tel.Altitude)
-                    self.separation_between_coordinates()
-                    self.imagescale = self.separation/distmoved
-                    print(self.imagescale, ' degrees per pixel.')
+                        self.tel.AbortSlew
+                        self.X2 = math.radians(self.tel.Azimuth)
+                        self.Y2 = math.radians(self.tel.Altitude)
+                        self.separation_between_coordinates()
+                        self.imagescale = self.separation/distmoved
+                        print(self.imagescale, ' degrees per pixel.')
                 if trackSettings.mounttype == 'Eq':
                     self.X1 = math.radians(float(self.tel.RightAscension)*15)
                     self.Y1 = math.radians(float(self.tel.Declination))
@@ -1157,7 +1157,7 @@ class buttons:
         trackSettings.degorhours = 'Degrees'
         self.read_to_hash()
         self.telalt = self.respdegrees
-
+    
     def LX200_dec_degrees(self):
         self.ser.write(str.encode(':GD#'))
         bytesToRead = self.ser.inWaiting()
