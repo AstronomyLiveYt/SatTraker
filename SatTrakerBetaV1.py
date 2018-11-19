@@ -23,7 +23,7 @@ import imutils #If needing to pip install use pip/pip3 install imutils depending
 from PIL import Image as PILImage, ImageTk #If needing to pip install use pip/pip3 install Pillow  depending on version of python
 from urllib.request import urlopen
 
-if os.name != 'nt'
+if os.name != 'nt':
 	class IndiClient(PyIndi.BaseClient):
 		def __init__(self):
 			super(IndiClient, self).__init__()
@@ -37,8 +37,8 @@ if os.name != 'nt'
 			global cmonitor
 			# we catch the "CONNECTION" property of the monitored device
 			if (p.getDeviceName()==monitored and p.getName() == "CONNECTION"):
-			cmonitor=p.getSwitch()
-			print("New property ", p.getName(), " for device ", p.getDeviceName())
+				cmonitor=p.getSwitch()
+				print("New property ", p.getName(), " for device ", p.getDeviceName())
 		def removeProperty(self, p):
 			pass
 		def newBLOB(self, bp):
@@ -270,7 +270,10 @@ class buttons:
         self.startButton.grid(row=7, column = 1)
         self.startButton = Button(self.bottomframe, text='Connect/Disconnect Scope', command=self.set_tracking)
         self.startButton.grid(row=1, column = 1)
-        self.ComLabel = Label(self.bottomframe, text='COM Port')
+        if os.name == 'nt':
+            self.ComLabel = Label(self.bottomframe, text='COM Port')
+        if os.name != 'nt':
+            self.ComLabel = Label(self.bottomframe, text='Serial Device Port')
         self.ComLabel.grid(row = 2, column = 0)
         self.entryCom = Entry(self.bottomframe)
         self.entryCom.grid(row = 2, column = 1)
@@ -298,7 +301,7 @@ class buttons:
         self.menu.add_cascade(label='Telescope Type', menu=self.telescopeMenu)
         self.telescopeMenu.add_command(label='LX200 Classic Alt/Az', command=self.setLX200AltAz)
         self.telescopeMenu.add_command(label='LX200 Classic Equatorial', command=self.setLX200Eq)
-	if os.name == 'nt': 
+        if os.name == 'nt': 
                 self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
                 self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
 #       if os.name == 'posix': 
@@ -933,6 +936,8 @@ class buttons:
                         self.comport = str('COM'+str(self.entryCom.get()))
                     if os.name == 'posix':
                         self.comport = str(self.entryCom.get())
+                        if '/' not in self.comport: #If user doesn't specify a path containing / assume it's a /dev/ entry
+                            self.comport = str('/dev/'+str(self.comport))
                     self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
                     self.ser.write(str.encode(':U#'))
                     self.serialconnected = True
