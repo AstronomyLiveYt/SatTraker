@@ -17,8 +17,8 @@ import threading
 if os.name == 'nt': #ignore this import on non-windows systems
 	import win32com.client
 if os.name != 'nt': #Non windows system use INDI
-	import PyIndi
-import imutils #If needing to pip install use pip/pip3 install imutils depending on version of pytho
+	import PyIndi #If needing to pip install use pip/pip3 install pyindi-client depending on version of python
+import imutils #If needing to pip install use pip/pip3 install imutils depending on version of python
 from PIL import Image as PILImage, ImageTk
 
 #TODO add conditionals around win32 code
@@ -957,7 +957,7 @@ class buttons:
                         axis2 = self.tel.CanMoveAxis(1)
                         if axis is False or axis2 is False:
                             print('This scope cannot use the MoveAxis method, aborting.')
-                            self.tel.Connected = False 
+                            self.tel.Connected = False
                         else:
                             self.axis0rate = float(self.tel.AxisRates(0).Item(1).Maximum)
                             self.axis1rate = float(self.tel.AxisRates(1).Item(1).Maximum)
