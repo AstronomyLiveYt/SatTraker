@@ -1,23 +1,69 @@
 from tkinter import *
 from tkinter import filedialog
-import ephem
+import ephem #If needed to pip install use pip/pip3 install pyephem depending on version of python
 import math
 import os
-import cv2
+import cv2 #If needing to pip install use pip/pip3 install opencv-python depending on version of python
 import numpy as np
 import sys
 import time
 import datetime
 import re
 import json
-import geocoder
-import serial
+import geocoder #If needing to pip install use pip/pip3 install geocoder depending on version of python
+import serial #If needing to pip install use pip/pip3 install pyserial depending on version of python
 import io
 import threading
-import win32com.client
-import imutils
+if os.name == 'nt': #ignore this import on non-windows systems
+	import win32com.client
+if os.name != 'nt': #Non windows system use INDI
+	import PyIndi
+import imutils #If needing to pip install use pip/pip3 install imutils depending on version of pytho
 from PIL import Image as PILImage, ImageTk
+
+#TODO add conditionals around win32 code
+from PIL import Image as PILImage, ImageTk #If needing to pip install use pip/pip3 install Pillow  depending on version of python
 from urllib.request import urlopen
+
+if os.name != 'nt'
+	class IndiClient(PyIndi.BaseClient):
+		def __init__(self):
+			super(IndiClient, self).__init__()
+		def newDevice(self, d):
+			global dmonitor
+			# We catch the monitored device
+			dmonitor=d
+			print("New device ", d.getDeviceName())
+		def newProperty(self, p):
+			global monitored
+			global cmonitor
+			# we catch the "CONNECTION" property of the monitored device
+			if (p.getDeviceName()==monitored and p.getName() == "CONNECTION"):
+			cmonitor=p.getSwitch()
+			print("New property ", p.getName(), " for device ", p.getDeviceName())
+		def removeProperty(self, p):
+			pass
+		def newBLOB(self, bp):
+			pass
+		def newSwitch(self, svp):
+			pass
+		def newNumber(self, nvp):
+			global newval
+			global prop
+			# We only monitor Number properties of the monitored device
+			prop=nvp
+			newval=True
+		def newText(self, tvp):
+			pass
+		def newLight(self, lvp):
+			pass
+		def newMessage(self, d, m):
+			pass
+		def serverConnected(self):
+			pass
+		def serverDisconnected(self, code):
+			pass
+
 
 class trackSettings:
     
@@ -254,8 +300,15 @@ class buttons:
         self.menu.add_cascade(label='Telescope Type', menu=self.telescopeMenu)
         self.telescopeMenu.add_command(label='LX200 Classic Alt/Az', command=self.setLX200AltAz)
         self.telescopeMenu.add_command(label='LX200 Classic Equatorial', command=self.setLX200Eq)
-        self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
-        self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
+	if os.name == 'nt': 
+                self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
+                self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
+#       if os.name == 'posix': 
+#                self.telescopeMenu.add_command(label='INDI Alt/Az (NOT FUNCTIONAL YET)', command=self.setINDIAltAz)
+#                self.telescopeMenu.add_command(label='INDI Equatorial (NOT FUNCTIONAL YET)', command=self.setINDIEq)
+
+        
+        
         
         self.trackingMenu = Menu(self.menu)
         self.menu.add_cascade(label='Tracking Type', menu=self.trackingMenu)
@@ -366,18 +419,18 @@ class buttons:
                 self.radaz = self.sat.az 
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
-                        sataz = math.degrees(self.sat.az) + 180
-                        if sataz > 360:
-                            sataz = sataz - 360
-                        sataz = math.radians(sataz)
-                        self.radaz = sataz
-                        self.rad_to_sexagesimal_alt()
-                        targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
-                        targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
-                        self.ser.write(str.encode(targetcoordaz))
-                        self.ser.write(str.encode(targetcoordalt))
-                        self.ser.write(str.encode(':MA#'))
-                        print(targetcoordaz, targetcoordalt)
+                    sataz = math.degrees(self.sat.az) + 180
+                    if sataz > 360:
+                        sataz = sataz - 360
+                    sataz = math.radians(sataz)
+                    self.radaz = sataz
+                    self.rad_to_sexagesimal_alt()
+                    targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
+                    targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
+                    self.ser.write(str.encode(targetcoordaz))
+                    self.ser.write(str.encode(targetcoordalt))
+                    self.ser.write(str.encode(':MA#'))
+                    print(targetcoordaz, targetcoordalt)
                     if trackSettings.mounttype == 'Eq':
                         satra = self.sat.ra
                         self.radra = self.sat.ra
@@ -418,17 +471,17 @@ class buttons:
                     self.observer.date = (d + datetime.timedelta(seconds=0))
                     self.sat.compute(self.observer)
                     if trackSettings.mounttype == 'AltAz':
-                        self.radalt = self.sat.alt
-                        self.radaz = self.sat.az
-                        self.observer.date = (d + datetime.timedelta(seconds=1))
-                        self.sat.compute(self.observer)
-                        self.radalt2 = self.sat.alt
-                        self.radaz2 = self.sat.az
-                        print(math.degrees(self.radaz), math.degrees(self.radalt))
+                    self.radalt = self.sat.alt
+                    self.radaz = self.sat.az
+                    self.observer.date = (d + datetime.timedelta(seconds=1))
+                    self.sat.compute(self.observer)
+                    self.radalt2 = self.sat.alt
+                    self.radaz2 = self.sat.az
+                    print(math.degrees(self.radaz), math.degrees(self.radalt))
                         azrate = (math.degrees(self.radaz2 - self.radaz))
-                        altrate = math.degrees(self.radalt2 - self.radalt)
-                        self.tel.Tracking = False
-                        self.tel.SlewToAltAz(math.degrees(self.radaz2),math.degrees(self.radalt2))
+                    altrate = math.degrees(self.radalt2 - self.radalt)
+                    self.tel.Tracking = False
+                    self.tel.SlewToAltAz(math.degrees(self.radaz2),math.degrees(self.radalt2))
                         print(azrate, altrate)
                         if azrate > self.axis0rate:
                             azrate = self.axis0rate
@@ -438,8 +491,8 @@ class buttons:
                             altrate = self.axis1rate
                         if altrate < (-1*self.axis1rate):
                             altrate = (-1*self.axis1rate)
-                        self.tel.MoveAxis(0, azrate)
-                        self.tel.MoveAxis(1, altrate)
+                    self.tel.MoveAxis(0, azrate)
+                    self.tel.MoveAxis(1, altrate)
                     if trackSettings.mounttype == 'Eq':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
@@ -476,16 +529,16 @@ class buttons:
                     d = datetime.datetime.utcnow()
                     self.sat.compute(self.observer)
                     if trackSettings.mounttype == 'AltAz':
-                        self.radalt = self.sat.alt
-                        self.radaz = self.sat.az
-                        currentaz = self.tel.Azimuth
-                        currentalt = self.tel.Altitude
-                        diffaz = math.degrees(self.radaz) - currentaz
-                        diffalt = math.degrees(self.radalt) - currentalt
-                        self.observer.date = (d + datetime.timedelta(seconds=1))
-                        self.sat.compute(self.observer)
-                        self.radalt2 = self.sat.alt
-                        self.radaz2 = self.sat.az
+                    self.radalt = self.sat.alt
+                    self.radaz = self.sat.az
+                    currentaz = self.tel.Azimuth
+                    currentalt = self.tel.Altitude
+                    diffaz = math.degrees(self.radaz) - currentaz
+                    diffalt = math.degrees(self.radalt) - currentalt
+                    self.observer.date = (d + datetime.timedelta(seconds=1))
+                    self.sat.compute(self.observer)
+                    self.radalt2 = self.sat.alt
+                    self.radaz2 = self.sat.az
                         trueazrate = (math.degrees(self.radaz2 - self.radaz))
                         truealtrate = math.degrees(self.radalt2 - self.radalt)
                         azrate = trueazrate+(diffaz*0.75)
@@ -500,12 +553,12 @@ class buttons:
                             altrate = self.axis1rate
                         if altrate < (-1*self.axis1rate):
                             altrate = (-1*self.axis1rate)
-                        self.tel.MoveAxis(0, azrate)
-                        self.tel.MoveAxis(1, altrate)
-                        self.diffazlast = diffaz
+                    self.tel.MoveAxis(0, azrate)
+                    self.tel.MoveAxis(1, altrate)
+                    self.diffazlast = diffaz
                         self.diffaltlast = diffalt
-                        altcorrect = 0
-                        azcorrect = 0
+                    altcorrect = 0
+                    azcorrect = 0
                     if trackSettings.mounttype == 'Eq':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
@@ -546,35 +599,35 @@ class buttons:
                     time.sleep(0.001)
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
-                        sataz = math.degrees(self.sat.az) + 180
-                        if sataz > 360:
-                            sataz = sataz - 360
-                        sataz = math.radians(sataz)
-                        self.radaz = sataz
-                        if i > 100:
-                            self.LX200_alt_degrees()
-                            self.LX200_alt_degrees()
-                            currentalt = math.radians(self.telalt)
-                            self.LX200_az_degrees()
-                            currentaz = math.radians(self.telaz)
-                            altdiff = self.radalt - currentalt
-                            azdiff = self.radaz - currentaz
-                            altcorrect = altcorrect + (altdiff)
-                            azcorrect = azcorrect + (azdiff)
-                            totaldiff = math.sqrt(altdiff**2 + azdiff**2)
-                            i = 0
-                            print(math.degrees(totaldiff))
-                            self.lasttotaldiff = totaldiff
-                        
-                        self.radaz = self.radaz + azcorrect
-                        self.radalt = self.radalt + altcorrect
-                        
-                        self.rad_to_sexagesimal_alt()
-                        targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
-                        targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
-                        self.ser.write(str.encode(targetcoordaz))
-                        self.ser.write(str.encode(targetcoordalt))
-                        self.ser.write(str.encode(':MA#'))
+                    sataz = math.degrees(self.sat.az) + 180
+                    if sataz > 360:
+                        sataz = sataz - 360
+                    sataz = math.radians(sataz)
+                    self.radaz = sataz
+                    if i > 100:
+                        self.LX200_alt_degrees()
+                        self.LX200_alt_degrees()
+                        currentalt = math.radians(self.telalt)
+                        self.LX200_az_degrees()
+                        currentaz = math.radians(self.telaz)
+                        altdiff = self.radalt - currentalt
+                        azdiff = self.radaz - currentaz
+                        altcorrect = altcorrect + (altdiff)
+                        azcorrect = azcorrect + (azdiff)
+                        totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                        i = 0
+                        print(math.degrees(totaldiff))
+                        self.lasttotaldiff = totaldiff
+                    
+                    self.radaz = self.radaz + azcorrect
+                    self.radalt = self.radalt + altcorrect
+                    
+                    self.rad_to_sexagesimal_alt()
+                    targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
+                    targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
+                    self.ser.write(str.encode(targetcoordaz))
+                    self.ser.write(str.encode(targetcoordalt))
+                    self.ser.write(str.encode(':MA#'))
                     if trackSettings.mounttype == 'Eq':
                         satra = self.sat.ra
                         self.radra = self.sat.ra
@@ -650,22 +703,6 @@ class buttons:
                                 #if math.fabs(self.diffazlast) < math.fabs(azdiff):
                                 azrate = azrate + azdiff
                                 #if math.fabs(self.diffaltlast) < math.fabs(altdiff):
-                                altrate = altrate + altdiff
-                                if azrate > self.axis0rate:
-                                    azrate = self.axis0rate
-                                if azrate < (-1*self.axis0rate):
-                                    azrate = (-1*self.axis0rate)
-                                if altrate > self.axis1rate:
-                                    altrate = self.axis1rate
-                                if altrate < (-1*self.axis1rate):
-                                    altrate = (-1*self.axis1rate)
-                                print('azdiff, altdiff, azrate, altrate', azdiff, altdiff, azrate, altrate, end='\r')
-                                self.tel.MoveAxis(0, azrate)
-                                self.tel.MoveAxis(1, altrate)
-                                self.diffazlast = azdiff
-                                self.diffallast = altdiff
-                            except:
-                                print('Failed to do the math.')
                     if trackSettings.mounttype == 'Eq':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra
@@ -714,50 +751,50 @@ class buttons:
                                 print('Failed to do the math.')
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
-                        sataz = math.degrees(self.sat.az) + 180
-                        if sataz > 360:
-                            sataz = sataz - 360
-                        sataz = math.radians(sataz)
-                        self.radaz = sataz
-                        #check if it's time to correct and that we have a newer frame than last time
-                        if self.dnow > self.dlast:
-                            self.LX200_alt_degrees()
-                            self.LX200_alt_degrees()
-                            currentalt = math.radians(self.telalt)
-                            self.LX200_az_degrees()
-                            currentaz = math.radians(self.telaz)
-                            objectvertical = -1 * ((self.targetY - trackSettings.mainviewY) * trackSettings.imagescale)
-                            objecthorizontal = (self.targetX - trackSettings.mainviewX) * trackSettings.imagescale
-                            objectangle = math.degrees(math.atan2(objectvertical, objecthorizontal)) - 90
-                            objectangle2 = math.degrees(math.atan2(objectvertical, objecthorizontal))
-                            objectdistance = math.sqrt((objecthorizontal**2) + (objectvertical**2) - 2 * (objectvertical * objecthorizontal * math.cos(math.radians(objectangle))))
-                            try:
-                                objectalt = 90 - math.degrees(math.acos(math.cos(math.radians(objectdistance)) * math.cos(math.radians(90 - self.telalt)) + math.sin(math.radians(objectdistance)) * math.sin(math.radians(90 - self.telalt)) * math.cos(math.radians(objectangle))))
-                                diffinaz = math.degrees(math.acos((math.cos(math.radians(objectdistance)) - math.cos(math.radians(90 - self.telalt)) * math.cos(math.radians(90 - objectalt))) / (math.sin(math.radians(90 - self.telalt)) * math.sin(math.radians(90 - objectalt)))))
-                                if math.fabs(objectangle2) > 90:
-                                    diffinaz = -1 * diffinaz
-                                altdiff = math.radians(objectalt) - currentalt
-                                azdiff = math.radians(diffinaz)
-                                totaldiff = math.sqrt(altdiff**2 + azdiff**2)
-                                #if total dist to target is increasing since last frame we need to correct!
-                                if self.lasttotaldiff < totaldiff:
-                                    altcorrect = altcorrect + (altdiff)
-                                    azcorrect = azcorrect + (azdiff)
-                                print(math.degrees(totaldiff))
-                                self.lasttotaldiff = totaldiff
-                            except:
-                                print('Failed to do the math.')
-                            #print(math.degrees(altcorrect), math.degrees(azcorrect), math.degrees(altdiff), math.degrees(azdiff), math.degrees(currentalt), math.degrees(currentaz))
-                        self.dlast = self.dnow
-                        self.radaz = self.radaz + azcorrect
-                        self.radalt = self.radalt + altcorrect
-                        
-                        self.rad_to_sexagesimal_alt()
-                        targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
-                        targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
-                        self.ser.write(str.encode(targetcoordaz))
-                        self.ser.write(str.encode(targetcoordalt))
-                        self.ser.write(str.encode(':MA#'))
+                    sataz = math.degrees(self.sat.az) + 180
+                    if sataz > 360:
+                        sataz = sataz - 360
+                    sataz = math.radians(sataz)
+                    self.radaz = sataz
+                    #check if it's time to correct and that we have a newer frame than last time
+                    if self.dnow > self.dlast:
+                        self.LX200_alt_degrees()
+                        self.LX200_alt_degrees()
+                        currentalt = math.radians(self.telalt)
+                        self.LX200_az_degrees()
+                        currentaz = math.radians(self.telaz)
+                        objectvertical = -1 * ((self.targetY - trackSettings.mainviewY) * trackSettings.imagescale)
+                        objecthorizontal = (self.targetX - trackSettings.mainviewX) * trackSettings.imagescale
+                        objectangle = math.degrees(math.atan2(objectvertical, objecthorizontal)) - 90
+                        objectangle2 = math.degrees(math.atan2(objectvertical, objecthorizontal))
+                        objectdistance = math.sqrt((objecthorizontal**2) + (objectvertical**2) - 2 * (objectvertical * objecthorizontal * math.cos(math.radians(objectangle))))
+                        try:
+                            objectalt = 90 - math.degrees(math.acos(math.cos(math.radians(objectdistance)) * math.cos(math.radians(90 - self.telalt)) + math.sin(math.radians(objectdistance)) * math.sin(math.radians(90 - self.telalt)) * math.cos(math.radians(objectangle))))
+                            diffinaz = math.degrees(math.acos((math.cos(math.radians(objectdistance)) - math.cos(math.radians(90 - self.telalt)) * math.cos(math.radians(90 - objectalt))) / (math.sin(math.radians(90 - self.telalt)) * math.sin(math.radians(90 - objectalt)))))
+                            if math.fabs(objectangle2) > 90:
+                                diffinaz = -1 * diffinaz
+                            altdiff = math.radians(objectalt) - currentalt
+                            azdiff = math.radians(diffinaz)
+                            totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                            #if total dist to target is increasing since last frame we need to correct!
+                            if self.lasttotaldiff < totaldiff:
+                                altcorrect = altcorrect + (altdiff)
+                                azcorrect = azcorrect + (azdiff)
+                            print(math.degrees(totaldiff))
+                            self.lasttotaldiff = totaldiff
+                        except:
+                            print('Failed to do the math.')
+                        #print(math.degrees(altcorrect), math.degrees(azcorrect), math.degrees(altdiff), math.degrees(azdiff), math.degrees(currentalt), math.degrees(currentaz))
+                    self.dlast = self.dnow
+                    self.radaz = self.radaz + azcorrect
+                    self.radalt = self.radalt + altcorrect
+                    
+                    self.rad_to_sexagesimal_alt()
+                    targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
+                    targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
+                    self.ser.write(str.encode(targetcoordaz))
+                    self.ser.write(str.encode(targetcoordalt))
+                    self.ser.write(str.encode(':MA#'))
                     if trackSettings.mounttype == 'EQ':
                         self.raddec = self.sat.dec
                         self.radra = self.sat.ra 
@@ -803,7 +840,7 @@ class buttons:
             time.sleep(0.005)
         #stop moving the telescope if the user is on ASCOM and requested stop tracking.
         if trackSettings.telescopetype == 'ASCOM' and trackSettings.trackingsat is False:
-            self.tel.AbortSlew
+            self.tel.AbortSlew    
     
     def set_center(self):
         trackSettings.setcenter = True
@@ -825,9 +862,17 @@ class buttons:
     def setASCOMAltAz(self):
         trackSettings.telescopetype = 'ASCOM'
         trackSettings.mounttype = 'AltAz'
-    
+        
     def setASCOMEq(self):
         trackSettings.telescopetype = 'ASCOM'
+        trackSettings.mounttype = 'Eq'
+    
+    def setINDIAltAz(self):
+        trackSettings.telescopetype = 'INDI'
+        trackSettings.mounttype = 'AltAz'
+        
+    def setINDIEq(self):
+        trackSettings.telescopetype = 'INDI'
         trackSettings.mounttype = 'Eq'
     
     def set_img_collect(self):
@@ -870,7 +915,10 @@ class buttons:
             print('Connecting to Scope.')
             if trackSettings.telescopetype == 'LX200':
                 try:
-                    self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'nt':
+                        self.comport = str('COM'+str(self.entryCom.get()))
+                    if os.name == 'posix':
+                        self.comport = str(self.entryCom.get())
                     self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
                     self.ser.write(str.encode(':U#'))
                     self.serialconnected = True
@@ -893,12 +941,26 @@ class buttons:
                         axis2 = self.tel.CanMoveAxis(1)
                         if axis is False or axis2 is False:
                             print('This scope cannot use the MoveAxis method, aborting.')
-                            self.tel.Connected = False
-                        else:
+                            self.tel.Connected = False 
+                    else:
                             self.axis0rate = float(self.tel.AxisRates(0).Item(1).Maximum)
                             self.axis1rate = float(self.tel.AxisRates(1).Item(1).Maximum)
                             print(self.axis0rate)
                             print(self.axis1rate)
+                    else:
+                        print("Unable to connect to telescope, expect exception")
+            elif trackSettings.telescopetype == 'INDI':
+                if self.tel.Connected:
+                    print("Telescope was already connected")
+                else:
+                    self.tel.Connected = True
+                    if self.tel.Connected:
+                        print("Connected to telescope now")
+                        axis = self.tel.CanMoveAxis(0)
+                        axis2 = self.tel.CanMoveAxis(1)
+                        if axis is False or axis2 is False:
+                            print('This scope cannot use the MoveAxis method, aborting.')
+                            self.tel.Connected = False 
                     else:
                         print("Unable to connect to telescope, expect exception")
         else:
@@ -909,6 +971,9 @@ class buttons:
                 self.ser.close()
                 self.serialconnected = False
             elif trackSettings.telescopetype == 'ASCOM':
+                self.tel.AbortSlew()
+                self.tel.Connected = False
+            elif trackSettings.telescopetype == 'INDI':
                 self.tel.AbortSlew()
                 self.tel.Connected = False
             trackSettings.tracking = False
@@ -950,38 +1015,38 @@ class buttons:
             
             if trackSettings.telescopetype == 'ASCOM':
                 if trackSettings.mounttype == 'AltAz':
-                    self.X1 = math.radians(self.tel.Azimuth)
-                    self.Y1 = math.radians(self.tel.Altitude)
-                    startx = self.targetX
-                    starty = self.targetY
-                    if starty < (self.height/2):
-                        distmoved = 0
-                        self.tel.MoveAxis(1, 0.1)
-                        while distmoved < 100:
-                            currentx = self.targetX
-                            currenty = self.targetY
-                            distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                self.X1 = math.radians(self.tel.Azimuth)
+                self.Y1 = math.radians(self.tel.Altitude)
+                startx = self.targetX
+                starty = self.targetY
+                if starty < (self.height/2):
+                    distmoved = 0
+                    self.tel.MoveAxis(1, 0.1)
+                    while distmoved < 100:
+                        currentx = self.targetX
+                        currenty = self.targetY
+                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
-                        self.X2 = math.radians(self.tel.Azimuth)
-                        self.Y2 = math.radians(self.tel.Altitude)
-                        self.separation_between_coordinates()
-                        self.imagescale = self.separation/distmoved
-                        print(self.imagescale, ' degrees per pixel.')
-                    else:
-                        distmoved = 0
-                        self.tel.MoveAxis(1, -0.1)
-                        while distmoved < 100:
-                            currentx = self.targetX
-                            currenty = self.targetY
-                            distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                    self.tel.AbortSlew
+                    self.X2 = math.radians(self.tel.Azimuth)
+                    self.Y2 = math.radians(self.tel.Altitude)
+                    self.separation_between_coordinates()
+                    self.imagescale = self.separation/distmoved
+                    print(self.imagescale, ' degrees per pixel.')
+                else:
+                    distmoved = 0
+                    self.tel.MoveAxis(1, -0.1)
+                    while distmoved < 100:
+                        currentx = self.targetX
+                        currenty = self.targetY
+                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew
-                        self.X2 = math.radians(self.tel.Azimuth)
-                        self.Y2 = math.radians(self.tel.Altitude)
-                        self.separation_between_coordinates()
-                        self.imagescale = self.separation/distmoved
-                        print(self.imagescale, ' degrees per pixel.')
+                    self.tel.AbortSlew
+                    self.X2 = math.radians(self.tel.Azimuth)
+                    self.Y2 = math.radians(self.tel.Altitude)
+                    self.separation_between_coordinates()
+                    self.imagescale = self.separation/distmoved
+                    print(self.imagescale, ' degrees per pixel.')
                 if trackSettings.mounttype == 'Eq':
                     self.X1 = math.radians(float(self.tel.RightAscension)*15)
                     self.Y1 = math.radians(float(self.tel.Declination))
@@ -1076,7 +1141,7 @@ class buttons:
         trackSettings.degorhours = 'Degrees'
         self.read_to_hash()
         self.telalt = self.respdegrees
-    
+
     def LX200_dec_degrees(self):
         self.ser.write(str.encode(':GD#'))
         bytesToRead = self.ser.inWaiting()
