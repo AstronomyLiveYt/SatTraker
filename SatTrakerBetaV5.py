@@ -163,6 +163,8 @@ class buttons:
         self.topframe = Frame(master)
         master.winfo_toplevel().title("SatTraker")
         self.topframe.pack(side=TOP)
+        self.textframe = Frame(master)
+        self.textframe.pack(side=BOTTOM)
         self.bottomframe = Frame(master)
         self.bottomframe.pack(side=BOTTOM)
         self.menu = Menu(master)
@@ -214,22 +216,25 @@ class buttons:
         except:
             self.entryLat.insert(0, trackSettings.Lat)
             self.entryLon.insert(0, trackSettings.Lon)
+
         
         #self.entryBright.insert(0, trackSettings.minbright)
-        self.startButton = Button(self.bottomframe, text='Start/Stop Camera', command=self.set_img_collect)
+        self.startButton = Button(self.bottomframe, text='Start Camera', command=self.set_img_collect)
         self.startButton.grid(row=1, column = 0)
-        self.startButton = Button(self.bottomframe, text='Camera Calibration', command=self.start_calibration)
-        self.startButton.grid(row=4, column = 0)
-        self.startButton = Button(self.bottomframe, text='Set Center Point', command=self.set_center)
-        self.startButton.grid(row=4, column = 1)
-        self.startButton = Button(self.bottomframe, text='Start Tracking Satellite', command=self.start_sat_track)
-        self.startButton.grid(row=7, column = 1)
-        self.startButton = Button(self.bottomframe, text='Connect/Disconnect Scope', command=self.set_tracking)
-        self.startButton.grid(row=1, column = 1)
+        self.startButton2 = Button(self.bottomframe, text='Camera Calibration', command=self.start_calibration)
+        self.startButton2.grid(row=4, column = 0)
+        self.startButton3 = Button(self.bottomframe, text='Set Center Point', command=self.set_center)
+        self.startButton3.grid(row=4, column = 1)
+        self.startButton4 = Button(self.bottomframe, text='Start Tracking Satellite', command=self.start_sat_track)
+        self.startButton4.grid(row=7, column = 1)
+        self.startButton5 = Button(self.bottomframe, text='Connect Scope', command=self.set_tracking)
+        self.startButton5.grid(row=1, column = 1)
         self.ComLabel = Label(self.bottomframe, text='COM Port')
         self.ComLabel.grid(row = 2, column = 0)
         self.entryCom = Entry(self.bottomframe)
         self.entryCom.grid(row = 2, column = 1)
+        self.textbox = Text(self.textframe, height=4, width=100)
+        self.textbox.grid(row=1, column=0)
         try:
             self.entryCom.insert(0, clines[1])
         except:
@@ -319,18 +324,27 @@ class buttons:
         trackSettings.orbitFile = filedialog.askopenfilename(initialdir = ".",title = "Select TLE file",filetypes = (("text files","*.txt"),("tle files","*.tle"),("all files","*.*")))
         trackSettings.fileSelected = True
         print(trackSettings.orbitFile)
+        self.textbox.insert(END, str(str(trackSettings.orbitFile)+'\n'))
+        self.textbox.see('end')
     
     def start_sat_track(self):
         if trackSettings.trackingsat is False:
             trackSettings.trackingsat = True
         else:
             trackSettings.trackingsat = False
+            self.startButton4.configure(text='Start Tracking Satellite')
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
+            self.textbox.insert(END, 'Connect the Scope First!\n')
+            self.textbox.see('end')
         if self.collect_images is False:
             print('Start Camera First!')
+            self.textbox.insert(END, 'Start Camera First!\n')
+            self.textbox.see('end')
         if trackSettings.fileSelected is False:
             print('Select TLE File First!')
+            self.textbox.insert(END, 'Select TLE File First!\n')
+            self.textbox.see('end')
         if trackSettings.tracking is True and self.collect_images is True and trackSettings.trackingsat is True and trackSettings.fileSelected is True:
             with open(trackSettings.orbitFile) as f:
                 lines = [line.rstrip('\n') for line in f]
@@ -345,6 +359,7 @@ class buttons:
                 self.observer.pressure = 1013
                 self.sat = ephem.readtle(line1,line2,line3)
             self.sattrackthread = threading.Thread(target=self.sat_track)
+            self.startButton4.configure(text='Stop Tracking Satellite')
             self.sattrackthread.start()
         
     def sat_track(self):
@@ -378,6 +393,8 @@ class buttons:
                         self.ser.write(str.encode(targetcoordalt))
                         self.ser.write(str.encode(':MA#'))
                         print(targetcoordaz, targetcoordalt)
+                        self.textbox.insert(END, str('Az: ' + str(targetcoordaz) + 'Alt: ' + str(targetcoordalt)+ '\n'))
+                        self.textbox.see('end')
                     if trackSettings.mounttype == 'Eq':
                         satra = self.sat.ra
                         self.radra = self.sat.ra
@@ -389,6 +406,8 @@ class buttons:
                         self.ser.write(str.encode(targetcoorddec))
                         self.ser.write(str.encode(':MS#'))
                         print(targetcoordra, targetcoorddec)
+                        self.textbox.insert(END, str('RA: '+str(targetcoordra) + 'Dec: ' + str(targetcoorddec)+ '\n'))
+                        self.textbox.see('end')
                     time.sleep(1)
                     #Do alt degrees twice to clear the buffer cause I'm too lazy to clear the buffer properly
                     self.LX200_alt_degrees()
@@ -425,6 +444,8 @@ class buttons:
                         self.radalt2 = self.sat.alt
                         self.radaz2 = self.sat.az
                         print(math.degrees(self.radaz), math.degrees(self.radalt))
+                        self.textbox.insert(END, str('Target Az: '+str(self.radaz) + ' Target Alt: ' + str(self.radalt)+ '\n'))
+                        self.textbox.see('end')
                         azrate = (math.degrees(self.radaz2 - self.radaz))
                         altrate = math.degrees(self.radalt2 - self.radalt)
                         self.tel.Tracking = False
@@ -448,6 +469,8 @@ class buttons:
                         self.raddec2 = self.sat.dec
                         self.radra2 = self.sat.ra
                         print(math.degrees(self.radra), math.degrees(self.raddec))
+                        self.textbox.insert(END, str('Target RA: '+str(self.radra) + 'Target Dec: ' + str(self.raddec)+ '\n'))
+                        self.textbox.see('end')
                         rarate = -1*(math.degrees(self.radra2 - self.radra))*math.cos(self.raddec2)
                         decrate = math.degrees(self.raddec2 - self.raddec)
                         self.tel.Tracking = False
@@ -492,6 +515,8 @@ class buttons:
                         altrate = truealtrate+(diffalt*0.75)
                         
                         print('diffaz, diffalt, azrate, altrate', diffaz, diffalt, azrate, altrate, end='\r')
+                        self.textbox.insert(END, str('Delta Az: ' + str(diffaz) + ' Delta Alt: ' + str(diffalt) + '\n'))
+                        self.textbox.see('end')
                         if azrate > self.axis0rate:
                             azrate = self.axis0rate
                         if azrate < (-1*self.axis0rate):
@@ -537,6 +562,8 @@ class buttons:
                         if decrate < (-1*self.axis1rate):
                             decrate = (-1*self.axis1rate)
                         print('diffra, diffdec, rarate, decrate', diffra, diffdec, rarate, decrate, end='\r')
+                        self.textbox.insert(END, str('Delta RA: ' + str(diffra) + ' Delta Dec: ' + str(diffdec) + '\n'))
+                        self.textbox.see('end')
                         self.tel.MoveAxis(0, rarate)
                         self.tel.MoveAxis(1, decrate)
                         self.diffralast = diffra
@@ -564,6 +591,8 @@ class buttons:
                             totaldiff = math.sqrt(altdiff**2 + azdiff**2)
                             i = 0
                             print(math.degrees(totaldiff))
+                            self.textbox.insert(END, str('Distance from target: ' + str(totaldiff) + '\n'))
+                            self.textbox.see('end')
                             self.lasttotaldiff = totaldiff
                         
                         self.radaz = self.radaz + azcorrect
@@ -590,6 +619,8 @@ class buttons:
                         totaldiff = math.sqrt(decdiff**2 + radiff**2)
                         i = 0
                         print(math.degrees(totaldiff))
+                        self.textbox.insert(END, str('Distance from target: ' + str(totaldiff) + '\n'))
+                        self.textbox.see('end')
                         if self.lasttotaldiff < totaldiff:
                             deccorrect = deccorrect + (decdiff)
                             racorrect = racorrect + (radiff)
@@ -660,6 +691,8 @@ class buttons:
                                 if altrate < (-1*self.axis1rate):
                                     altrate = (-1*self.axis1rate)
                                 print('azdiff, altdiff, azrate, altrate', azdiff, altdiff, azrate, altrate, end='\r')
+                                self.textbox.insert(END, str('Delta Az: ' + str(azdiff) + ' Delta Alt: ' + str(altdiff) + '\n'))
+                                self.textbox.see('end')
                                 self.tel.MoveAxis(0, azrate)
                                 self.tel.MoveAxis(1, altrate)
                                 self.diffazlast = azdiff
@@ -744,6 +777,8 @@ class buttons:
                                     altcorrect = altcorrect + (altdiff)
                                     azcorrect = azcorrect + (azdiff)
                                 print(math.degrees(totaldiff))
+                                self.textbox.insert(END, str('Distance from target: ' + str(totaldiff) + '\n'))
+                                self.textbox.see('end')
                                 self.lasttotaldiff = totaldiff
                             except:
                                 print('Failed to do the math.')
@@ -786,6 +821,8 @@ class buttons:
                                     deccorrect = deccorrect + (decdiff)
                                     racorrect = racorrect + (radiff)
                                 print(math.degrees(totaldiff))
+                                self.textbox.insert(END, str('Distance from Target: ' + str(totaldiff) + '\n'))
+                                self.textbox.see('end')
                                 self.lasttotaldiff = totaldiff
                             except:
                                 print('Failed to do the math.')
@@ -834,13 +871,17 @@ class buttons:
         if self.collect_images is False:
             self.collect_images = True
             print('Starting Camera.')
+            self.textbox.insert(END, 'Starting Camera.\n')
+            self.textbox.see('end')
             self.cap = cv2.VideoCapture(int(self.entryCam.get()))
             self.displayimg = Label(self.topframe, bg="black")
+            self.startButton.configure(text='Stop Camera')
             imagethread = threading.Thread(target=self.prepare_img_for_tkinter)
             imagethread.start()
         else:
             self.cap.release()
             self.collect_images = False
+            self.startButton.configure(text='Start Camera')
     
     def read_to_hash(self):
         self.resp = self.ser.read()
@@ -850,6 +891,8 @@ class buttons:
                 self.resp += self.ser.read().decode("utf-8", errors="ignore")
         except:
             print('Unable to read line')
+            self.textbox.insert(END, 'Unable to read line.\n')
+            self.textbox.see('end')
         #print(self.resp)
         if trackSettings.degorhours == 'Degrees':
             self.deg = int(self.resp[0:3])
@@ -868,14 +911,19 @@ class buttons:
         if trackSettings.tracking is False:
             trackSettings.tracking = True
             print('Connecting to Scope.')
+            self.textbox.insert(END, 'Connecting to Scope.\n')
+            self.textbox.see('end')
             if trackSettings.telescopetype == 'LX200':
                 try:
                     self.comport = str('COM'+str(self.entryCom.get()))
                     self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
                     self.ser.write(str.encode(':U#'))
                     self.serialconnected = True
+                    self.startButton5.configure(text='Disconnect Scope')
                 except:
                     print('Failed to connect on ' + self.comport)
+                    self.textbox.insert(END, str('Failed to connect on ' + str(self.comport) + '\n'))
+                    self.textbox.see('end')
                     trackSettings.tracking = False
                     return
             elif trackSettings.telescopetype == 'ASCOM':
@@ -885,24 +933,38 @@ class buttons:
                 self.tel=win32com.client.Dispatch(driverName)
                 if self.tel.Connected:
                     print("Telescope was already connected")
+                    self.textbox.insert(END, str('Telescope was already connected.\n'))
+                    self.textbox.see('end')
+                    self.startButton5.configure(text='Disconnect Scope')
                 else:
                     self.tel.Connected = True
                     if self.tel.Connected:
                         print("Connected to telescope now")
+                        self.textbox.insert(END, str('Connected to telescope now.\n'))
+                        self.textbox.see('end')
                         axis = self.tel.CanMoveAxis(0)
                         axis2 = self.tel.CanMoveAxis(1)
                         if axis is False or axis2 is False:
                             print('This scope cannot use the MoveAxis method, aborting.')
+                            self.textbox.insert(END, str('This scope cannot use the MoveAxis method, aborting.\n'))
+                            self.textbox.see('end')
                             self.tel.Connected = False
                         else:
                             self.axis0rate = float(self.tel.AxisRates(0).Item(1).Maximum)
                             self.axis1rate = float(self.tel.AxisRates(1).Item(1).Maximum)
                             print(self.axis0rate)
                             print(self.axis1rate)
+                            self.textbox.insert(END, str('Axis 0 max rate: '+str(self.axis0rate)+' Axis 1 max rate: '+ str(self.axis1rate)+'\n'))
+                            self.textbox.see('end')
+                            self.startButton5.configure(text='Disconnect Scope')
                     else:
                         print("Unable to connect to telescope, expect exception")
+                        self.textbox.insert(END, str('Unable to connect to telescope, expect exception.\n'))
+                        self.textbox.see('end')
         else:
             print('Disconnecting the Scope.')
+            self.textbox.insert(END, str('Disconnecting the scope.\n'))
+            self.textbox.see('end')
             if trackSettings.telescopetype == 'LX200' and self.serialconnected is True:
                 self.ser.write(str.encode(':Q#'))
                 self.ser.write(str.encode(':U#'))
@@ -912,6 +974,7 @@ class buttons:
                 self.tel.AbortSlew()
                 self.tel.Connected = False
             trackSettings.tracking = False
+            self.startButton5.configure(text='Connect Scope')
     
     def rad_to_sexagesimal_alt(self):
         self.azdeg = math.degrees(self.radaz)
@@ -942,10 +1005,16 @@ class buttons:
     def set_calibration(self):
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
+            self.textbox.insert(END, str('Connect the Scope First!\n'))
+            self.textbox.see('end')
         if self.collect_images is False:
             print('Start Camera First!')
+            self.textbox.insert(END, str('Start Camera First!\n'))
+            self.textbox.see('end')
         if trackSettings.objectfollow is False:
             print('Pick a stationary calibration object first!')
+            self.textbox.insert(END, str('Pick a stationary target first!\n'))
+            self.textbox.see('end')
         if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True:
             
             if trackSettings.telescopetype == 'ASCOM':
@@ -968,6 +1037,8 @@ class buttons:
                         self.separation_between_coordinates()
                         self.imagescale = self.separation/distmoved
                         print(self.imagescale, ' degrees per pixel.')
+                        self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                        self.textbox.see('end')
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
@@ -982,6 +1053,8 @@ class buttons:
                         self.separation_between_coordinates()
                         self.imagescale = self.separation/distmoved
                         print(self.imagescale, ' degrees per pixel.')
+                        self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                        self.textbox.see('end')
                 if trackSettings.mounttype == 'Eq':
                     self.X1 = math.radians(float(self.tel.RightAscension)*15)
                     self.Y1 = math.radians(float(self.tel.Declination))
@@ -1002,6 +1075,8 @@ class buttons:
                         #print('x1 ', self.X1, 'y1 ', self.Y1, 'separation ', self.separation, 'distance moved ', distmoved)
                         self.imagescale = self.separation/distmoved
                         print(self.imagescale, ' degrees per pixel.')
+                        self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                        self.textbox.see('end')
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
@@ -1017,6 +1092,8 @@ class buttons:
                         #print('x1 ', self.X1, 'y1 ', self.Y1, 'separation ', self.separation, 'distance moved ', distmoved)
                         self.imagescale = self.separation/distmoved
                         print(self.imagescale, ' degrees per pixel.')
+                        self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                        self.textbox.see('end')
                 trackSettings.imagescale = self.imagescale            
             if trackSettings.telescopetype == 'LX200':
                 self.LX200_az_degrees()
@@ -1043,6 +1120,8 @@ class buttons:
                     self.separation_between_coordinates()
                     self.imagescale = self.separation/distmoved
                     print(self.imagescale, ' degrees per pixel.')
+                    self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                    self.textbox.see('end')
                 else:
                     distmoved = 0
                     self.ser.write(str.encode(':RC#'))
@@ -1060,6 +1139,8 @@ class buttons:
                     self.separation_between_coordinates()
                     self.imagescale = self.separation/distmoved
                     print(self.imagescale, ' degrees per pixel.')
+                    self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                    self.textbox.see('end')
                 trackSettings.imagescale = self.imagescale
                 
     
@@ -1113,6 +1194,8 @@ class buttons:
         if trackSettings.boxSize < 5:
             trackSettings.boxSize = 5
         print(trackSettings.boxSize)
+        self.textbox.insert(END, str('Tracking box size: '+str(trackSettings.boxSize)+'\n'))
+        self.textbox.see('end')
     
     def mouse_position(self, event):
         trackSettings.mousecoords = (event.x, event.y)
@@ -1246,6 +1329,8 @@ class buttons:
             After = root.after(10,self.prepare_img_for_tkinter)
         else:
             print('Stopping Camera.')
+            self.textbox.insert(END, str('Stopping Camera.\n'))
+            self.textbox.see('end')
         
 After = None
 root = Tk()
