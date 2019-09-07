@@ -44,6 +44,7 @@ class trackSettings:
     flip = 'NoFlip'
     foundtarget = False
     rotate = 0
+    calibratestart = False
     
 
 class videotrak:
@@ -1005,6 +1006,12 @@ class buttons:
         calibthread.start()
     
     def set_calibration(self):
+        if trackSettings.calibratestart is False:
+            trackSettings.calibratestart = True
+        else:
+            self.tel.MoveAxis(1, 0.0)
+            #self.tel.AbortSlew()
+            trackSettings.calibratestart = False
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
             self.textbox.insert(END, str('Connect the Scope First!\n'))
@@ -1017,8 +1024,7 @@ class buttons:
             print('Pick a stationary calibration object first!')
             self.textbox.insert(END, str('Pick a stationary target first!\n'))
             self.textbox.see('end')
-        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True:
-            
+        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True and trackSettings.calibratestart is True:
             if trackSettings.telescopetype == 'ASCOM':
                 if trackSettings.mounttype == 'AltAz':
                     self.X1 = math.radians(self.tel.Azimuth)
@@ -1028,12 +1034,14 @@ class buttons:
                     if starty < (self.height/2):
                         distmoved = 0
                         self.tel.MoveAxis(1, 0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, 0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew()
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.Azimuth)
                         self.Y2 = math.radians(self.tel.Altitude)
                         self.separation_between_coordinates()
@@ -1044,12 +1052,14 @@ class buttons:
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, -0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew()
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.Azimuth)
                         self.Y2 = math.radians(self.tel.Altitude)
                         self.separation_between_coordinates()
@@ -1065,12 +1075,14 @@ class buttons:
                     if starty < (self.height/2):
                         distmoved = 0
                         self.tel.MoveAxis(1, 0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, 0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew()
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.RightAscension*15)
                         self.Y2 = math.radians(self.tel.Declination)
                         self.separation_between_coordinates()
@@ -1082,12 +1094,14 @@ class buttons:
                     else:
                         distmoved = 0
                         self.tel.MoveAxis(1, -0.1)
-                        while distmoved < 100:
+                        while distmoved < 100 and trackSettings.calibratestart is True:
+                            self.tel.MoveAxis(1, -0.1)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
                             time.sleep(0.01)
-                        self.tel.AbortSlew()
+                        self.tel.MoveAxis(1, 0.0)
+                        #self.tel.AbortSlew()
                         self.X2 = math.radians(self.tel.RightAscension*15)
                         self.Y2 = math.radians(self.tel.Declination)
                         self.separation_between_coordinates()
@@ -1144,7 +1158,7 @@ class buttons:
                     self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
                     self.textbox.see('end')
                 trackSettings.imagescale = self.imagescale
-                
+            trackSettings.calibratestart = False    
     
     def separation_between_coordinates(self):
         self.separation = math.degrees(math.acos(math.sin(self.Y1)*math.sin(self.Y2) + math.cos(self.Y1)*math.cos(self.Y2)*math.cos(self.X1-self.X2)))
