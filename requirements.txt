@@ -1,0 +1,8 @@
+pywin32==228
+geocoder==1.38.1
+opencv_python==4.4.0.44
+numpy==1.19.2
+imutils==0.5.3
+Pillow==7.2.0
+pyephem==3.7.7.0
+pyserial==3.4
