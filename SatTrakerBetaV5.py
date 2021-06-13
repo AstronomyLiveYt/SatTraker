@@ -10,7 +10,6 @@ import time
 import datetime
 import re
 import json
-import geocoder
 import serial
 import io
 import threading
@@ -45,6 +44,10 @@ class trackSettings:
     foundtarget = False
     rotate = 0
     calibratestart = False
+    objectverticalpixels = 0
+    objecthorizontalpixels = 0
+    previousrecord = 0
+    calspeed = 0.1
     
 
 class videotrak:
@@ -176,12 +179,14 @@ class buttons:
         
         self.labelLat = Label(self.bottomframe, text='Latitude (N+)')
         self.labelLat.grid(row=5, column = 0)
-        self.entryLat = Entry(self.bottomframe)
+        self.entryLat = Entry(self.bottomframe, show="*")
         self.entryLat.grid(row = 5, column = 1)
         self.labelLon = Label(self.bottomframe, text='Longitude (E+)')
         self.labelLon.grid(row=6, column = 0)
-        self.entryLon = Entry(self.bottomframe)
+        self.entryLon = Entry(self.bottomframe, show="*")
         self.entryLon.grid(row = 6, column = 1)
+        self.recordvideo = IntVar()
+        
         
         #self.labelBright = Label(self.bottomframe, text='Minimum Brightness')
         #self.labelBright.grid(row=8, column = 0)
@@ -202,12 +207,13 @@ class buttons:
             trackSettings.flip = str(clines[10])
             trackSettings.mounttype = str(clines[11])
             trackSettings.rotate = int(clines[12])
+            trackSettings.calspeed = float(clines[13])
             config.close()
         except:
             print('Config file not present or corrupted.')
         
         try:
-            geolocation = geocoder.ip('me')
+            #geolocation = geocoder.ip('me')
             #self.entryLat.insert(0, geolocation.latlng[0])
             #self.entryLon.insert(0, geolocation.latlng[1])
             self.entryLat.insert(0, trackSettings.Lat)
@@ -230,6 +236,7 @@ class buttons:
         self.startButton5.grid(row=1, column = 1)
         self.ComLabel = Label(self.bottomframe, text='COM Port')
         self.ComLabel.grid(row = 2, column = 0)
+        self.recordv = Checkbutton(self.bottomframe, text="Record Video", variable=self.recordvideo).grid(row=8, column = 0, sticky=W)
         self.entryCom = Entry(self.bottomframe)
         self.entryCom.grid(row = 2, column = 1)
         self.textbox = Text(self.textframe, height=4, width=100)
@@ -243,10 +250,15 @@ class buttons:
         self.CameraLabel.grid(row = 3, column = 0)
         self.entryCam = Entry(self.bottomframe)
         self.entryCam.grid(row = 3, column = 1)
+        self.CalspeedLabel = Label(self.bottomframe, text='Calibration Speed \n(degree/second)')
+        self.CalspeedLabel.grid(row = 3, column = 2)
+        self.entryCal = Entry(self.bottomframe)
+        self.entryCal.grid(row = 3, column = 3)
         try:
             self.entryCam.insert(0, clines[2])
         except:
             self.entryCam.insert(0, 0)
+        self.entryCal.insert(0,trackSettings.calspeed)
         
         self.fileMenu = Menu(self.menu)
         self.menu.add_cascade(label='File', menu=self.fileMenu)
@@ -260,6 +272,7 @@ class buttons:
         self.telescopeMenu.add_command(label='LX200 Classic Equatorial', command=self.setLX200Eq)
         self.telescopeMenu.add_command(label='ASCOM Alt/Az', command=self.setASCOMAltAz)
         self.telescopeMenu.add_command(label='ASCOM Equatorial', command=self.setASCOMEq)
+        self.telescopeMenu.add_command(label='LX200 Autostar Alt/Az', command=self.setAutostarAltAz)
         
         self.trackingMenu = Menu(self.menu)
         self.menu.add_cascade(label='Tracking Type', menu=self.trackingMenu)
@@ -316,7 +329,10 @@ class buttons:
         config.write(str(trackSettings.flip)+'\n')
         config.write(str(trackSettings.mounttype)+'\n')
         config.write(str(trackSettings.rotate)+'\n')
+        config.write(str(self.entryCal.get())+'\n')
         config.close()
+        if self.recordvideo.get() == 1:
+            self.out.release()
         sys.exit()
     
     def filePicker(self):
@@ -382,6 +398,45 @@ class buttons:
                 self.sat.compute(self.observer)
                 self.radalt = self.sat.alt
                 self.radaz = self.sat.az 
+                if trackSettings.telescopetype == 'Autostar':
+                    if trackSettings.mounttype == 'AltAz':
+                        sataz = math.degrees(self.sat.az) + 180
+                        if sataz > 360:
+                            sataz = sataz - 360
+                        sataz = math.radians(sataz)
+                        self.radaz = sataz
+                        self.rad_to_sexagesimal_alt()
+                        targetcoordaz = str(':Sz ' + str(self.az_d)+'*'+str(self.az_m)+':'+str(int(self.az_s))+'#')
+                        targetcoordalt = str(':Sa ' + str(self.alt_d)+'*'+str(self.alt_m)+':'+str(int(self.alt_s))+'#')
+                        self.ser.write(str.encode(targetcoordaz))
+                        self.ser.write(str.encode(targetcoordalt))
+                        self.ser.write(str.encode(':MA#'))
+                        print(targetcoordaz, targetcoordalt)
+                        self.textbox.insert(END, str('Az: ' + str(targetcoordaz) + 'Alt: ' + str(targetcoordalt)+ '\n'))
+                        self.textbox.see('end')
+                    time.sleep(1)
+                    #Do alt degrees twice to clear the buffer cause I'm too lazy to clear the buffer properly
+                    self.LX200_alt_degrees()
+                    self.LX200_alt_degrees()
+                    currentalt = self.telalt
+                    self.LX200_az_degrees()
+                    currentaz = self.telaz
+                    altdiff = math.degrees(self.radalt) - currentalt
+                    azdiff = math.degrees(self.radaz) - currentaz
+                    totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                    self.lasttotaldiff = totaldiff
+                    self.dlast = self.dnow
+                    while totaldiff > 1:
+                        self.LX200_alt_degrees()
+                        self.LX200_alt_degrees()
+                        currentalt = self.telalt
+                        self.LX200_az_degrees()
+                        currentaz = self.telaz
+                        altdiff = math.degrees(self.radalt) - currentalt
+                        azdiff = math.degrees(self.radaz) - currentaz
+                        totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                        time.sleep(1)
+                firstslew = False
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
                         sataz = math.degrees(self.sat.az) + 180
@@ -432,6 +487,7 @@ class buttons:
                         altdiff = math.degrees(self.radalt) - currentalt
                         azdiff = math.degrees(self.radaz) - currentaz
                         totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                        #print(totaldiff)
                         time.sleep(1)
                 firstslew = False
                 if trackSettings.telescopetype == 'ASCOM':
@@ -574,6 +630,51 @@ class buttons:
                         deccorrect = 0
                         racorrect = 0
                     time.sleep(0.001)
+                if trackSettings.telescopetype == 'Autostar':
+                    self.observer.date = datetime.datetime.utcnow()
+                    d = datetime.datetime.utcnow()
+                    self.sat.compute(self.observer)
+                    if trackSettings.mounttype == 'AltAz':
+                        self.radalt = self.sat.alt
+                        self.radaz = self.sat.az 
+                        self.LX200_alt_degrees()
+                        self.LX200_alt_degrees()
+                        currentalt = self.telalt
+                        self.LX200_az_degrees()
+                        currentaz = self.telaz + 180
+                        diffaz = math.degrees(self.radaz) - currentaz
+                        diffalt = math.degrees(self.radalt) - currentalt
+                        self.observer.date = (d + datetime.timedelta(seconds=1))
+                        self.sat.compute(self.observer)
+                        self.radalt2 = self.sat.alt
+                        self.radaz2 = self.sat.az                  
+                        trueazrate = (math.degrees(self.radaz2 - self.radaz))
+                        truealtrate = math.degrees(self.radalt2 - self.radalt)
+                        azrate = trueazrate+(diffaz*0.75)
+                        altrate = truealtrate+(diffalt*0.75)
+                        
+                        print('diffaz, diffalt, azrate, altrate', diffaz, diffalt, azrate, altrate, end='\r')
+                        self.textbox.insert(END, str('Delta Az: ' + str(diffaz) + ' Delta Alt: ' + str(diffalt) + '\n'))
+                        self.textbox.see('end')
+                        if azrate > self.axis0rate:
+                            azrate = self.axis0rate
+                        if azrate < (-1*self.axis0rate):
+                            azrate = (-1*self.axis0rate)
+                        if altrate > self.axis1rate:
+                            altrate = self.axis1rate
+                        if altrate < (-1*self.axis1rate):
+                            altrate = (-1*self.axis1rate)
+                        self.ser.write(str.encode(str(':RA'+str(azrate)+'#')))
+                        self.ser.write(str.encode(str(':RE'+str(altrate)+'#')))
+                        self.ser.write(str.encode(':Me#'))
+                        self.ser.write(str.encode(':Mn#'))
+                        #self.tel.MoveAxis(0, azrate)
+                        #self.tel.MoveAxis(1, altrate)
+                        self.diffazlast = diffaz
+                        self.diffaltlast = diffalt
+                        altcorrect = 0
+                        azcorrect = 0
+
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
                         sataz = math.degrees(self.sat.az) + 180
@@ -748,6 +849,65 @@ class buttons:
                                 self.diffdeclast = decdiff
                             except:
                                 print('Failed to do the math.')
+                if trackSettings.telescopetype == 'Autostar':
+                    time.sleep(0.1)
+                    self.observer.date = datetime.datetime.utcnow()
+                    d = datetime.datetime.utcnow()
+                    self.sat.compute(self.observer)
+                    if trackSettings.mounttype == 'AltAz' and trackSettings.trackingsat is True:
+                        self.radalt = self.sat.alt
+                        self.radaz = self.sat.az
+                        self.LX200_alt_degrees()
+                        self.LX200_alt_degrees()
+                        currentalt = self.telalt
+                        self.LX200_az_degrees()
+                        currentaz = self.telaz + 180
+                        currentaltdegrees = currentalt
+                        if self.dnow > self.dlast:
+                            currentalt = math.radians(currentalt)
+                            currentaz = math.radians(currentaz)
+                            objectvertical = -1 * ((self.targetY - trackSettings.mainviewY) * trackSettings.imagescale)
+                            objecthorizontal = (self.targetX - trackSettings.mainviewX) * trackSettings.imagescale
+                            objectangle = math.degrees(math.atan2(objectvertical, objecthorizontal)) - 90
+                            objectangle2 = math.degrees(math.atan2(objectvertical, objecthorizontal))
+                            objectdistance = math.sqrt((objecthorizontal**2) + (objectvertical**2) - 2 * (objectvertical * objecthorizontal * math.cos(math.radians(objectangle))))
+                            try:
+                                objectalt = 90 - math.degrees(math.acos(math.cos(math.radians(objectdistance)) * math.cos(math.radians(90 - currentaltdegrees)) + math.sin(math.radians(objectdistance)) * math.sin(math.radians(90 - currentaltdegrees)) * math.cos(math.radians(objectangle))))
+                                diffinaz = math.degrees(math.acos((math.cos(math.radians(objectdistance)) - math.cos(math.radians(90 - currentaltdegrees)) * math.cos(math.radians(90 - objectalt))) / (math.sin(math.radians(90 - currentaltdegrees)) * math.sin(math.radians(90 - objectalt)))))
+                                if math.fabs(objectangle2) > 90:
+                                    diffinaz = -1 * diffinaz
+                                altdiff = math.degrees(math.radians(objectalt) - currentalt)
+                                azdiff = diffinaz
+                                totaldiff = math.sqrt(altdiff**2 + azdiff**2)
+                                self.observer.date = (d + datetime.timedelta(seconds=1))
+                                self.sat.compute(self.observer)
+                                self.radalt2 = self.sat.alt
+                                self.radaz2 = self.sat.az
+                                azrate = (math.degrees(self.radaz2 - self.radaz))
+                                altrate = math.degrees(self.radalt2 - self.radalt)
+                                #if math.fabs(self.diffazlast) < math.fabs(azdiff):
+                                azrate = azrate + azdiff
+                                #if math.fabs(self.diffaltlast) < math.fabs(altdiff):
+                                altrate = altrate + altdiff
+                                if azrate > self.axis0rate:
+                                    azrate = self.axis0rate
+                                if azrate < (-1*self.axis0rate):
+                                    azrate = (-1*self.axis0rate)
+                                if altrate > self.axis1rate:
+                                    altrate = self.axis1rate
+                                if altrate < (-1*self.axis1rate):
+                                    altrate = (-1*self.axis1rate)
+                                print('azdiff, altdiff, azrate, altrate', azdiff, altdiff, azrate, altrate, end='\r')
+                                self.textbox.insert(END, str('Delta Az: ' + str(azdiff) + ' Delta Alt: ' + str(altdiff) + '\n'))
+                                self.textbox.see('end')
+                                self.ser.write(str.encode(str(':RA'+str(azrate)+'#')))
+                                self.ser.write(str.encode(str(':RE'+str(altrate)+'#')))
+                                self.ser.write(str.encode(':Me#'))
+                                self.ser.write(str.encode(':Mn#'))
+                                self.diffazlast = azdiff
+                                self.diffallast = altdiff
+                            except:
+                                print('Failed to do the math.')
                 if trackSettings.telescopetype == 'LX200':
                     if trackSettings.mounttype == 'AltAz':
                         sataz = math.degrees(self.sat.az) + 180
@@ -870,6 +1030,10 @@ class buttons:
         trackSettings.telescopetype = 'ASCOM'
         trackSettings.mounttype = 'Eq'
     
+    def setAutostarAltAz(self):
+        trackSettings.telescopetype = 'Autostar'
+        trackSettings.mounttype = 'AltAz'
+    
     def set_img_collect(self):
         if self.collect_images is False:
             self.collect_images = True
@@ -929,6 +1093,22 @@ class buttons:
                     self.textbox.see('end')
                     trackSettings.tracking = False
                     return
+            elif trackSettings.telescopetype == 'Autostar':
+                try:
+                    self.axis0rate = 8
+                    self.axis1rate = 8
+                    self.comport = str('COM'+str(self.entryCom.get()))
+                    self.ser = serial.Serial(self.comport, baudrate=9600, timeout=1, bytesize=serial.EIGHTBITS, parity=serial.PARITY_NONE, stopbits=serial.STOPBITS_ONE, xonxoff=False, rtscts=False)
+                    #self.ser.write(str.encode(':U#'))
+                    self.serialconnected = True
+                    self.startButton5.configure(text='Disconnect Scope')
+                except Exception as e:
+                    print(e)
+                    print('Failed to connect on ' + self.comport)
+                    self.textbox.insert(END, str('Failed to connect on ' + str(self.comport) + '\n'))
+                    self.textbox.see('end')
+                    trackSettings.tracking = False
+                    return
             elif trackSettings.telescopetype == 'ASCOM':
                 self.x = win32com.client.Dispatch("ASCOM.Utilities.Chooser")
                 self.x.DeviceType = 'Telescope'
@@ -971,6 +1151,11 @@ class buttons:
             if trackSettings.telescopetype == 'LX200' and self.serialconnected is True:
                 self.ser.write(str.encode(':Q#'))
                 self.ser.write(str.encode(':U#'))
+                self.ser.close()
+                self.serialconnected = False
+            elif trackSettings.telescopetype == 'Autostar' and self.serialconnected is True:
+                self.ser.write(str.encode(':Q#'))
+                #self.ser.write(str.encode(':U#'))
                 self.ser.close()
                 self.serialconnected = False
             elif trackSettings.telescopetype == 'ASCOM':
@@ -1024,7 +1209,22 @@ class buttons:
             print('Pick a stationary calibration object first!')
             self.textbox.insert(END, str('Pick a stationary target first!\n'))
             self.textbox.see('end')
-        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True and trackSettings.calibratestart is True:
+        if trackSettings.telescopetype == 'ASCOM':
+            try:
+                trackSettings.calspeed = float(self.entryCal.get())
+                if trackSettings.calspeed > self.axis0rate:
+                    trackSettings.calspeed = self.axis0rate
+                speedset = True
+                if trackSettings.calspeed < 0:
+                    speedset = False
+                    print('Calibration speed needs to be a positive number!')
+                    self.textbox.insert(END, str('Calibration speed needs to be a positive number!'))
+            except:
+                speedset = False
+                print('Calibration speed needs to be a positive number!')
+                self.textbox.insert(END, str('Calibration speed needs to be a positive number!'))
+                self.textbox.see('end')
+        if trackSettings.tracking is True and self.collect_images is True and trackSettings.objectfollow is True and trackSettings.calibratestart is True and speedset is True:
             if trackSettings.telescopetype == 'ASCOM':
                 if trackSettings.mounttype == 'AltAz':
                     self.X1 = math.radians(self.tel.Azimuth)
@@ -1033,9 +1233,9 @@ class buttons:
                     starty = self.targetY
                     if starty < (self.height/2):
                         distmoved = 0
-                        self.tel.MoveAxis(1, 0.1)
+                        self.tel.MoveAxis(1, trackSettings.calspeed)
                         while distmoved < 100 and trackSettings.calibratestart is True:
-                            self.tel.MoveAxis(1, 0.1)
+                            self.tel.MoveAxis(1, trackSettings.calspeed)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
@@ -1051,9 +1251,9 @@ class buttons:
                         self.textbox.see('end')
                     else:
                         distmoved = 0
-                        self.tel.MoveAxis(1, -0.1)
+                        self.tel.MoveAxis(1, (-1*trackSettings.calspeed))
                         while distmoved < 100 and trackSettings.calibratestart is True:
-                            self.tel.MoveAxis(1, -0.1)
+                            self.tel.MoveAxis(1, (-1*trackSettings.calspeed))
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
@@ -1074,9 +1274,9 @@ class buttons:
                     starty = self.targetY
                     if starty < (self.height/2):
                         distmoved = 0
-                        self.tel.MoveAxis(1, 0.1)
+                        self.tel.MoveAxis(1, trackSettings.calspeed)
                         while distmoved < 100 and trackSettings.calibratestart is True:
-                            self.tel.MoveAxis(1, 0.1)
+                            self.tel.MoveAxis(1, trackSettings.calspeed)
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
@@ -1093,9 +1293,9 @@ class buttons:
                         self.textbox.see('end')
                     else:
                         distmoved = 0
-                        self.tel.MoveAxis(1, -0.1)
+                        self.tel.MoveAxis(1, (-1*trackSettings.calspeed))
                         while distmoved < 100 and trackSettings.calibratestart is True:
-                            self.tel.MoveAxis(1, -0.1)
+                            self.tel.MoveAxis(1, (-1*trackSettings.calspeed))
                             currentx = self.targetX
                             currenty = self.targetY
                             distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
@@ -1111,6 +1311,53 @@ class buttons:
                         self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
                         self.textbox.see('end')
                 trackSettings.imagescale = self.imagescale            
+            if trackSettings.telescopetype == 'Autostar':
+                self.LX200_az_degrees()
+                self.X1 = math.radians(self.respdegrees)
+                self.LX200_alt_degrees()
+                self.Y1 = math.radians(self.respdegrees)
+                startx = self.targetX
+                starty = self.targetY
+                
+                if starty < (self.height/2):
+                    distmoved = 0
+                    self.ser.write(str.encode(':RC#'))
+                    while distmoved < 100:
+                        self.ser.write(str.encode(':Mn#'))
+                        currentx = self.targetX
+                        currenty = self.targetY
+                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                        time.sleep(0.01)
+                    self.ser.write(str.encode(':Qn#'))
+                    self.LX200_az_degrees()
+                    self.X2 = math.radians(self.respdegrees)
+                    self.LX200_alt_degrees()
+                    self.Y2 = math.radians(self.respdegrees)
+                    self.separation_between_coordinates()
+                    self.imagescale = self.separation/distmoved
+                    print(self.imagescale, ' degrees per pixel.')
+                    self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                    self.textbox.see('end')
+                else:
+                    distmoved = 0
+                    self.ser.write(str.encode(':RC#'))
+                    while distmoved < 100:
+                        self.ser.write(str.encode(':Ms#'))
+                        currentx = self.targetX
+                        currenty = self.targetY
+                        distmoved = math.sqrt((startx-currentx)**2+(starty-currenty)**2)
+                        time.sleep(0.01)
+                    self.ser.write(str.encode(':Qs#'))
+                    self.LX200_az_degrees()
+                    self.X2 = math.radians(self.respdegrees)
+                    self.LX200_alt_degrees()
+                    self.Y2 = math.radians(self.respdegrees)
+                    self.separation_between_coordinates()
+                    self.imagescale = self.separation/distmoved
+                    print(self.imagescale, ' degrees per pixel.')
+                    self.textbox.insert(END, str('Image scale: '+str(self.imagescale)+' degrees per pixel.\n'))
+                    self.textbox.see('end')
+                trackSettings.imagescale = self.imagescale
             if trackSettings.telescopetype == 'LX200':
                 self.LX200_az_degrees()
                 self.X1 = math.radians(self.respdegrees)
@@ -1284,6 +1531,7 @@ class buttons:
                 self.img = imutils.rotate(self.img, trackSettings.rotate)
                 #remember current time of the frame
                 self.dnow = datetime.datetime.now()
+                self.datetimestring = str(self.dnow.strftime('%m%d%Y%H%M%S'))
                 self.height, self.width = self.img.shape[:2]
                 self.displayimg.bind("<MouseWheel>", self._on_mousewheel)
                 self.displayimg.bind("<Motion>", self.mouse_position)
@@ -1334,7 +1582,24 @@ class buttons:
                     self.trackimg.config(image=self.tracktkimg)
                     self.trackimg.img = self.tracktkimg
                     self.trackimg.grid(row = 0, column = 1)
-                    
+                if self.recordvideo.get() == 1:
+                    if trackSettings.previousrecord == 0:
+                        self.fourcc = cv2.VideoWriter_fourcc(*str('WMV1'))
+                        self.out = cv2.VideoWriter(str(self.datetimestring + '.wmv'),self.fourcc, 30, (self.width,self.height))
+                        self.datetimestring2 = str(self.dnow.strftime('%m-%d-%Y %H:%M:%S.%f'))
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                        self.out.write(self.img)
+                        trackSettings.previousrecord = 1
+                    else:
+                        self.datetimestring2 = str(self.dnow.strftime('%m-%d-%Y %H:%M:%S.%f'))
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                        self.out.write(self.img)
+                else:
+                    if trackSettings.previousrecord == 1:
+                        self.out.release()
+                        trackSettings.previousrecord = 0
                 self.b,self.g,self.r = cv2.split(self.imgtk)
                 self.tkimg = cv2.merge((self.r,self.g,self.b))
                 self.tkimg = PILImage.fromarray(self.tkimg)
@@ -1351,3 +1616,4 @@ After = None
 root = Tk()
 b = buttons(root)
 root.mainloop()
+
