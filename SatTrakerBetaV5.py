@@ -179,11 +179,11 @@ class buttons:
         
         self.labelLat = Label(self.bottomframe, text='Latitude (N+)')
         self.labelLat.grid(row=5, column = 0)
-        self.entryLat = Entry(self.bottomframe, show="*")
+        self.entryLat = Entry(self.bottomframe)
         self.entryLat.grid(row = 5, column = 1)
         self.labelLon = Label(self.bottomframe, text='Longitude (E+)')
         self.labelLon.grid(row=6, column = 0)
-        self.entryLon = Entry(self.bottomframe, show="*")
+        self.entryLon = Entry(self.bottomframe)
         self.entryLon.grid(row = 6, column = 1)
         self.recordvideo = IntVar()
         
@@ -1194,8 +1194,9 @@ class buttons:
         if trackSettings.calibratestart is False:
             trackSettings.calibratestart = True
         else:
-            self.tel.MoveAxis(1, 0.0)
-            #self.tel.AbortSlew()
+            if trackSettings.telescopetype == 'ASCOM':
+                self.tel.MoveAxis(1, 0.0)
+                #self.tel.AbortSlew()
             trackSettings.calibratestart = False
         if trackSettings.tracking is False:
             print('Connect the Scope First!')
@@ -1209,6 +1210,7 @@ class buttons:
             print('Pick a stationary calibration object first!')
             self.textbox.insert(END, str('Pick a stationary target first!\n'))
             self.textbox.see('end')
+        speedset = True
         if trackSettings.telescopetype == 'ASCOM':
             try:
                 trackSettings.calspeed = float(self.entryCal.get())
@@ -1584,18 +1586,28 @@ class buttons:
                     self.trackimg.grid(row = 0, column = 1)
                 if self.recordvideo.get() == 1:
                     if trackSettings.previousrecord == 0:
-                        self.fourcc = cv2.VideoWriter_fourcc(*str('WMV1'))
-                        self.out = cv2.VideoWriter(str(self.datetimestring + '.wmv'),self.fourcc, 30, (self.width,self.height))
+                        self.fourcc = cv2.VideoWriter_fourcc(*str('MP4V'))
+                        self.out = cv2.VideoWriter(str(self.datetimestring + '.mp4'),self.fourcc, 30, (self.width,self.height))
                         self.datetimestring2 = str(self.dnow.strftime('%m-%d-%Y %H:%M:%S.%f'))
                         font = cv2.FONT_HERSHEY_SIMPLEX
-                        self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
-                        self.out.write(self.img)
+                        try:
+                            imgout = self.imgtk.copy()
+                            imgout = cv2.putText(imgout, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                            self.out.write(imgout)
+                        except:
+                            self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                            self.out.write(self.img)
                         trackSettings.previousrecord = 1
                     else:
                         self.datetimestring2 = str(self.dnow.strftime('%m-%d-%Y %H:%M:%S.%f'))
                         font = cv2.FONT_HERSHEY_SIMPLEX
-                        self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
-                        self.out.write(self.img)
+                        try:
+                            imgout = self.imgtk.copy()
+                            imgout = cv2.putText(imgout, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                            self.out.write(imgout)
+                        except:
+                            self.img = cv2.putText(self.img, self.datetimestring2, (10,20), font,  0.5, (255,255,255), 1, cv2.LINE_AA)
+                            self.out.write(self.img)
                 else:
                     if trackSettings.previousrecord == 1:
                         self.out.release()
@@ -1616,4 +1628,3 @@ After = None
 root = Tk()
 b = buttons(root)
 root.mainloop()
-
