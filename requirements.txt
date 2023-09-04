@@ -1,0 +1,8 @@
+astropy==4.0
+imutils==0.5.3
+numpy==1.19.5
+opencv_python==3.4.8.29
+Pillow==7.0.0
+pyephem==3.7.7.0
+pyserial==3.4
+pywin32==227
