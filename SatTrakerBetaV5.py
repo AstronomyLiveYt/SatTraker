@@ -1,5 +1,6 @@
 from tkinter import *
 from tkinter import filedialog
+from tkinter import messagebox
 import ephem
 import math
 import os
@@ -16,6 +17,9 @@ import threading
 import win32com.client
 import imutils
 import pwi4_client
+
+event = threading.Event() #Used with satmonitor and exitprog to prevent an error when exiting
+
 from astropy.io import fits
 from PIL import Image as PILImage, ImageTk
 from urllib.request import urlopen
@@ -42,6 +46,7 @@ class trackSettings:
     fileSelected = False
     Lat = 0.0
     Lon = 0.0
+    hidell = 0
     trackingsat = False
     trackingtype = 'Features'
     minbright = 50
@@ -201,24 +206,26 @@ class buttons:
         master.bind("<a>", self.chleft)
         master.bind("<s>", self.chdown)
         master.bind("<d>", self.chright)
-        
         self.labelLat = Label(self.bottomframe, text='Latitude (N+)')
         self.labelLat.grid(row=5, column = 0)
         self.entryLat = Entry(self.bottomframe)
-        #self.entryLat = Entry(self.bottomframe, show='*')
-        self.entryLat.grid(row = 5, column = 1)
+        self.entryLat.grid(row = 5, column = 1)       
         self.labelLon = Label(self.bottomframe, text='Longitude (E+)')
         self.labelLon.grid(row=6, column = 0)
         self.entryLon = Entry(self.bottomframe)
-        #self.entryLon = Entry(self.bottomframe, show='*')
         self.entryLon.grid(row = 6, column = 1)
         self.recordvideo = IntVar()
+        
+        # Hide Lat/Lon
+        self.hidell = IntVar()
+        self.hideLatlon = Checkbutton(self.bottomframe, text="Hide Latitude/Longitude", variable=self.hidell, command=self.hide_latLong)
+        self.hideLatlon.grid(row=7, columnspan=2)
         
         self.satlist = ['Load TLE File']
         self.selectedsat = StringVar()
         self.selectedsat.set("Load TLE File")
         self.satDrop = OptionMenu(self.bottomframe, self.selectedsat, *self.satlist, command=self.sat_changed)
-        self.satDrop.grid(row = 7, column = 0)
+        self.satDrop.grid(row = 8, column = 0)
         self.altLabel = Label(self.bottomframe, text='Selected Satellite Altitude: ')
         self.altLabel.grid(row = 5, column = 2)
         self.azLabel = Label(self.bottomframe, text='Selected Satellite Azimuth: ')
@@ -228,9 +235,9 @@ class buttons:
         self.azVal = Label(self.bottomframe, text='Load TLE')
         self.azVal.grid(row = 6, column = 3)
         self.searchLabel = Label(self.bottomframe, text='Search TLE File ')
-        self.searchLabel.grid(row = 7, column = 2)
+        self.searchLabel.grid(row = 8, column = 2)
         self.entrySearch = Entry(self.bottomframe)
-        self.entrySearch.grid(row = 7, column = 3)
+        self.entrySearch.grid(row = 8, column = 3)
         self.entrySearch.bind("<Return>", self.search)
         #self.labelBright = Label(self.bottomframe, text='Minimum Brightness')
         #self.labelBright.grid(row=8, column = 0)
@@ -246,27 +253,36 @@ class buttons:
             trackSettings.imagescale = float(clines[5])
             trackSettings.Lat = float(clines[6])
             trackSettings.Lon = float(clines[7])
-            trackSettings.trackingtype = str(clines[8])
-            trackSettings.minbright = float(clines[9])
-            trackSettings.flip = str(clines[10])
-            trackSettings.mounttype = str(clines[11])
-            trackSettings.rotate = int(clines[12])
-            trackSettings.calspeed = float(clines[13])
-            trackSettings.crosshairX = int(clines[14])
-            trackSettings.crosshairY = int(clines[15])
-            trackSettings.exptime = float(clines[16])
-            trackSettings.cameratype = str(clines[17])
-            trackSettings.histowidth = float(clines[18])
+            trackSettings.hidell = int(clines[8])
+            trackSettings.trackingtype = str(clines[9])
+            trackSettings.minbright = float(clines[10])
+            trackSettings.flip = str(clines[11])
+            trackSettings.mounttype = str(clines[12])
+            trackSettings.rotate = int(clines[13])
+            trackSettings.calspeed = float(clines[14])
+            trackSettings.crosshairX = int(clines[15])
+            trackSettings.crosshairY = int(clines[16])
+            trackSettings.exptime = float(clines[17])
+            trackSettings.cameratype = str(clines[18])
+            trackSettings.histowidth = float(clines[19])
             config.close()
         except:
-            print('Config file not present or corrupted.')
         
+               
+            print('Config file not present or corrupted.')
+            #traceback.print_exc()
         try:
             #geolocation = geocoder.ip('me')
             #self.entryLat.insert(0, geolocation.latlng[0])
             #self.entryLon.insert(0, geolocation.latlng[1])
             self.entryLat.insert(0, trackSettings.Lat)
             self.entryLon.insert(0, trackSettings.Lon)
+            if trackSettings.hidell == 1:
+                self.hideLatlon.toggle()
+                self.entryLon.config(show="*")
+                self.entryLat.config(show="*")
+                
+                      
         except:
             self.entryLat.insert(0, trackSettings.Lat)
             self.entryLon.insert(0, trackSettings.Lon)
@@ -280,14 +296,14 @@ class buttons:
         self.startButton3 = Button(self.bottomframe, text='Set Center Point', command=self.set_center)
         self.startButton3.grid(row=4, column = 1)
         self.startButton4 = Button(self.bottomframe, text='Start Tracking Satellite', command=self.start_sat_track)
-        self.startButton4.grid(row=7, column = 1)
+        self.startButton4.grid(row=8, column = 1)
         self.startButton5 = Button(self.bottomframe, text='Connect Scope', command=self.set_tracking)
         self.startButton5.grid(row=1, column = 1)
         self.startButton6 = Button(self.bottomframe, text='Reset Crosshair', command=self.set_crosshair)
         self.startButton6.grid(row=4, column = 2)
         self.ComLabel = Label(self.bottomframe, text='COM Port')
         self.ComLabel.grid(row = 2, column = 0)
-        self.recordv = Checkbutton(self.bottomframe, text="Record Video", variable=self.recordvideo).grid(row=8, column = 0, sticky=W)
+        self.recordv = Checkbutton(self.bottomframe, text="Record Video", variable=self.recordvideo).grid(row=10, column = 0, sticky=W)
         self.entryCom = Entry(self.bottomframe)
         self.entryCom.grid(row = 2, column = 1)
         self.textbox = Text(self.textframe, height=4, width=100)
@@ -322,22 +338,22 @@ class buttons:
             self.entryCam.insert(0, 0)
         self.entryCal.insert(0,trackSettings.calspeed)
         try:
-            self.entryExp.insert(0, clines[16])
+            self.entryExp.insert(0, clines[17])
         except:
             self.entryExp.insert(0,trackSettings.exptime)
             
         try:
-            self.entryHist.insert(0, clines[18])
+            self.entryHist.insert(0, clines[19])
         except:
             self.entryHist.insert(0,trackSettings.histowidth)
         
-        self.fileMenu = Menu(self.menu)
+        self.fileMenu = Menu(self.menu, tearoff="off")
         self.menu.add_cascade(label='File', menu=self.fileMenu)
         self.fileMenu.add_command(label='Select TLE File...', command=self.filePicker)
         self.fileMenu.add_separator()
         self.fileMenu.add_command(label='Exit and Save Configuration', command=self.exitProg)
         
-        self.telescopeMenu = Menu(self.menu)
+        self.telescopeMenu = Menu(self.menu, tearoff="off")
         self.menu.add_cascade(label='Telescope Type', menu=self.telescopeMenu)
         self.telescopeMenu.add_command(label='LX200 Classic Alt/Az', command=self.setLX200AltAz)
         self.telescopeMenu.add_command(label='LX200 Classic Equatorial', command=self.setLX200Eq)
@@ -346,7 +362,7 @@ class buttons:
         self.telescopeMenu.add_command(label='LX200 Autostar Alt/Az', command=self.setAutostarAltAz)
         self.telescopeMenu.add_command(label='PlaneWave Alt/Az', command=self.setPlaneWaveAltAz)
 
-        self.cameraMenu = Menu(self.menu)
+        self.cameraMenu = Menu(self.menu, tearoff="off")
         self.menu.add_cascade(label='Camera Type', menu=self.cameraMenu)
         self.cameraMenu.add_command(label='Windows Camera', command=self.setWindowsCamera)
         self.cameraMenu.add_command(label='ASCOM Camera', command=self.setASCOMCamera)        
@@ -366,7 +382,27 @@ class buttons:
         self.imageMenu.add_command(label='Rotate Image 90 Degrees', command=self.setPos90Rotate)
         self.imageMenu.add_command(label='Rotate Image -90 Degrees', command=self.setNeg90Rotate)
         self.imageMenu.add_command(label='Rotate Image 180 Degrees', command=self.set180Rotate)
+        
+        #self.aboutHelp = Menu(self.menu, tearoff="off")
+        #self.menu.add_cascade(label='About', menu=self.aboutHelp)
+        #self.aboutHelp.add_command(label='About ' + master.winfo_toplevel().title(), command=self.aboutMenu)
+        
+    def aboutMenu(self):
+        window=Tk()
+        print('help')
+        self.ComLabel = Label(self.bottomframe, text='COM Port')
+        window.title('Hello Python')
+        window.geometry("300x200+10+20")
+        b = Button(window, text ="Hello", command = self.closeHelp)
+        b.place(x=50, y=50)
+        window.overrideredirect(True)
+        
+        
+    def closeHelp(self):
+        self.exit()
     
+
+        #webbrowser.open(yturl, new=0, autoraise=True)
     def setWindowsCamera(self):
         trackSettings.cameratype = 'Windows'
     
@@ -398,6 +434,7 @@ class buttons:
         trackSettings.rotate = 180
         
     def exitProg(self):
+        event.set()
         config = open('satconfig.txt','w')
         config.write(str(trackSettings.telescopetype)+'\n')
         config.write(str(self.entryCom.get()) + '\n')
@@ -407,6 +444,7 @@ class buttons:
         config.write(str(trackSettings.imagescale) + '\n')
         config.write(str(self.entryLat.get())+'\n')
         config.write(str(self.entryLon.get())+'\n')
+        config.write(str(self.hidell.get())+'\n')
         config.write(str(trackSettings.trackingtype) + '\n')
         config.write(str(trackSettings.minbright)+'\n')
         config.write(str(trackSettings.flip)+'\n')
@@ -440,7 +478,6 @@ class buttons:
                 self.monitorsat = ephem.readtle(trackSettings.tlelist[trackSettings.satselection][0],trackSettings.tlelist[trackSettings.satselection][1],trackSettings.tlelist[trackSettings.satselection][2])
                 self.satmonitorthread = threading.Thread(target=self.satmonitor)
                 self.satmonitorthread.start()
-                break
         if searchsuccess is False:
             self.textbox.insert(END, 'Satellite Not Found in TLE File\n')
             self.textbox.see('end')
@@ -459,6 +496,8 @@ class buttons:
         self.monitorsat = ephem.readtle(trackSettings.tlelist[trackSettings.satselection][0],trackSettings.tlelist[trackSettings.satselection][1],trackSettings.tlelist[trackSettings.satselection][2])
         self.satmonitorthread = threading.Thread(target=self.satmonitor)
         self.satmonitorthread.start()
+        
+
     
     def satmonitor(self):
         while trackSettings.satelliteselected is True:
@@ -474,6 +513,8 @@ class buttons:
             self.altVal.config(text = str(str(monalt)+' Degrees'))
             self.azVal.config(text = str(str(monaz)+' Degrees'))
             time.sleep(1)
+            if event.is_set():
+                break
 
     def filePicker(self):
         trackSettings.orbitFile = filedialog.askopenfilename(initialdir = ".",title = "Select TLE file",filetypes = (("text files","*.txt"),("tle files","*.tle"),("all files","*.*")))
@@ -486,7 +527,8 @@ class buttons:
         self.textbox.insert(END, str(str(trackSettings.orbitFile)+'\n'))
         self.textbox.see('end')
         #Reminder user to pick a satellite before starting tracking
-        self.selectedsat.set("Select Satellite")
+        self.selectedsat.set("Select Satellite2")
+        #self.selectedsat.grid(row = 8, column = 0)
         self.altVal.config(text = "Select Satellite")
         self.azVal.config(text = "Select Satellite")
         #Repopulate satellite list
@@ -503,8 +545,22 @@ class buttons:
         #Replace dropdown list with new list by destroying the old dropdown and placing a new one
         self.satDrop.destroy()
         self.satDrop = OptionMenu(self.bottomframe, self.selectedsat, *self.satlist, command=self.sat_changed)
-        self.satDrop.grid(row = 7, column = 0)
-    
+        self.satDrop.grid(row = 8, column = 0)
+    #Start Show/Hide Lat/Lon    
+    def hide_latLong(self):
+        if self.entryLon.cget('show') == '':
+            self.entryLon.config(show="*")
+            self.entryLat.config(show="*")
+        else:
+            answer = messagebox.askquestion("Show Latitude and Longitude?", "Are you sure you want to show latitude and longitude?")
+            if answer == "yes":
+                self.entryLon.config(show="")
+                self.entryLat.config(show="")
+            else:
+                self.hideLatlon.toggle()            
+                self.entryLon.config(show="*")
+                self.entryLat.config(show="*")
+    #End Show/Hide Lat/Lon    
     def start_sat_track(self):
         if trackSettings.trackingsat is False:
             trackSettings.trackingsat = True
